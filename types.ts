@@ -1,4 +1,3 @@
-
 export enum Language {
   ENGLISH = 'en-US',
   TAMIL = 'ta-IN',
@@ -11,6 +10,12 @@ export enum Language {
 
 export type Persona = 'Formal' | 'Neutral' | 'Casual';
 
+export interface GoogleUser {
+    name: string;
+    email: string;
+    picture: string;
+}
+
 export interface UserPreferences {
     persona: Persona;
 }
@@ -19,6 +24,7 @@ export interface Reminder {
     id: string;
     task: string;
     time: string;
+    date?: string; 
 }
 
 export interface TodoItem {
@@ -32,7 +38,7 @@ export interface CalendarEvent {
     title: string;
     time: string;
     attendees?: string[];
-    date?: string; // Added for historical events
+    date?: string; 
 }
 
 export interface DraftEmail {
@@ -68,11 +74,11 @@ export interface FileSearchResult {
 
 export interface ChatMessage {
   role: 'user' | 'model';
-  content: string; // Always a string for the main text part
+  content: string; 
   fileInfo?: {
     name: string;
     type: string;
-    previewUrl?: string; // For images
+    previewUrl?: string;
   };
   sentiment?: Sentiment;
   // Structured data payloads
@@ -89,4 +95,12 @@ export interface ChatMessage {
   // Interactive components
   interactiveChoice?: { prompt: string; options: { title: string; payload: string }[] };
   breakTimer?: { durationSeconds: number };
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  // Fix: Corrected typo from ChatMessageType to ChatMessage.
+  messages: ChatMessage[];
+  createdAt: number;
 }

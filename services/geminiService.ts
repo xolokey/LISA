@@ -56,7 +56,7 @@ const getLanguageName = (lang: Language): string => {
     }
 };
 
-const getSystemInstruction = (language: Language, persona: Persona) => {
+const getSystemInstruction = (language: Language, persona: Persona, isSignedIn: boolean) => {
     const languageName = getLanguageName(language);
     let personaInstruction = '';
     switch (persona) {
@@ -71,9 +71,15 @@ const getSystemInstruction = (language: Language, persona: Persona) => {
             personaInstruction = 'Adopt a neutral, helpful, and direct tone.';
             break;
     }
+
+    const authContext = isSignedIn
+      ? 'You are connected to the user\'s Google Account. You can manage their Google Calendar, Google Tasks, and draft emails in Gmail. When confirming actions, mention the service (e.g., "Added to Google Calendar").'
+      : 'The user is not signed in. You can still manage a local calendar, to-do list, and draft emails.';
+
     return `You are Lisa, an advanced AI personal assistant. Your role is to be a helpful and versatile assistant.
 Your current user's language is ${languageName}. Respond in this language unless specified otherwise.
 ${personaInstruction}
+${authContext}
 Your capabilities include conversation, sentiment analysis, code generation, document parsing, task management (reminders, to-dos), calendar coordination, email drafting, and file searching via tools. Be helpful, proactive, and concise.`;
 };
 
@@ -146,6 +152,27 @@ const tools = [{
                 required: ['title', 'time'] 
             }
         },
+        {
+          name: 'presentChoices',
+          description: 'Presents the user with a set of choices to clarify an ambiguous request.',
+          parameters: {
+              type: Type.OBJECT,
+              properties: {
+                  prompt: { type: Type.STRING, description: 'The question to ask the user.' },
+                  options: {
+                      type: Type.ARRAY,
+                      items: {
+                          type: Type.OBJECT,
+                          properties: {
+                              title: { type: Type.STRING, description: 'The user-facing text for the button.' },
+                              payload: { type: Type.STRING, description: 'The text sent back to the model if the user clicks it.' }
+                          }
+                      }
+                  }
+              },
+              required: ['prompt', 'options']
+          }
+        }
     ]
 }];
 
@@ -154,13 +181,14 @@ export const generateChatResponse = async (
   newMessage: string,
   language: Language,
   persona: Persona,
+  isSignedIn: boolean,
   file?: File
 ): Promise<Partial<ChatMessage>> => {
 
   const chat = ai.chats.create({
     model: 'gemini-2.5-flash',
     history: history,
-    config: { systemInstruction: getSystemInstruction(language, persona), tools }
+    config: { systemInstruction: getSystemInstruction(language, persona, isSignedIn), tools }
   });
 
   const messageParts: any[] = [{ text: newMessage }];
@@ -213,6 +241,15 @@ export const generateChatResponse = async (
           const event: CalendarEvent = { id: '', ...call.args as any };
           toolExecutionResult = { status: 'success', event };
           toolResponsePayload = { calendarEvent: event };
+      } else if (call.name === 'presentChoices') {
+          // This tool doesn't need a response back to the model, it's a UI instruction.
+          return {
+              interactiveChoice: {
+                  prompt: call.args.prompt as string,
+                  options: call.args.options as any[],
+              },
+              content: ''
+          };
       }
       
       const toolResponse = await chat.sendMessage({
@@ -376,4 +413,14 @@ export const performSemanticSearch = async (query: string, language: Language): 
     });
 
     return { summary: result.text, files };
+};
+
+export const generateChatTitle = async (firstMessage: string): Promise<string> => {
+    const prompt = `Generate a very short, concise title (4-5 words max) for a chat session that starts with this message: "${firstMessage}". The title should be in the same language as the message. Do not add quotes or any other formatting around the title. Just return the title text.`;
+    const result = await model.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: { temperature: 0.3 }
+    });
+    return result.text.replace(/"/g, '').trim();
 };

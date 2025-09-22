@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ChatMessage as ChatMessageType, InvoiceData, FileSearchResult, Language, Sentiment, Reminder, TodoItem, DraftEmail, CalendarEvent } from '../types';
+import { ChatMessage as ChatMessageType, InvoiceData, FileSearchResult, Language, Sentiment, Reminder, TodoItem, DraftEmail, CalendarEvent, GoogleUser } from '../types';
 import Card from './common/Card';
 import CodeBlock from './common/CodeBlock';
 import { ICONS } from '../constants';
@@ -35,7 +35,6 @@ const translations = {
 // --- START: Local Sub-components for Rich Messages ---
 
 const InvoiceCard: React.FC<{ data: InvoiceData }> = ({ data }) => {
-    // ... (implementation is the same as before, truncated for brevity)
     const { language } = useAppContext();
     const t = translations[language] || translations[Language.ENGLISH];
     return (
@@ -62,7 +61,6 @@ const getFileIcon = (type: FileSearchResult['files'][0]['type']) => {
 };
 
 const FileSearchResultCard: React.FC<{ data: FileSearchResult }> = ({ data }) => {
-    // ... (implementation is the same as before, truncated for brevity)
     const { language } = useAppContext();
     const t = translations[language] || translations[Language.ENGLISH];
     return (
@@ -83,7 +81,7 @@ const FileSearchResultCard: React.FC<{ data: FileSearchResult }> = ({ data }) =>
     );
 };
 
-const ReminderCard: React.FC<{ data: Reminder }> = ({ data }) => {
+const ReminderCard: React.FC<{ data: Reminder; user: GoogleUser | null }> = ({ data, user }) => {
     const { language } = useAppContext();
     const t = translations[language] || translations[Language.ENGLISH];
     return (
@@ -94,46 +92,51 @@ const ReminderCard: React.FC<{ data: Reminder }> = ({ data }) => {
     );
 };
 
-const TodoCard: React.FC<{ data: TodoItem }> = ({ data }) => {
+const TodoCard: React.FC<{ data: TodoItem; user: GoogleUser | null }> = ({ data, user }) => {
     const { language } = useAppContext();
     const t = translations[language] || translations[Language.ENGLISH];
+    const source = user ? 'via Google Tasks' : '';
     return (
         <Card className="mt-2 !p-3 bg-blue-50 border-blue-200">
             <p className="font-semibold text-sm text-blue-600 mb-1">{t.todoAdded}</p>
             <p className="text-text-primary">{data.item}</p>
+            {source && <p className="text-xs text-blue-500 mt-1">{source}</p>}
         </Card>
     );
 };
 
-const TodoToggledCard: React.FC<{ data: NonNullable<ChatMessageType['todoToggled']> }> = ({ data }) => {
+const TodoToggledCard: React.FC<{ data: NonNullable<ChatMessageType['todoToggled']>; user: GoogleUser | null }> = ({ data, user }) => {
     const { language } = useAppContext();
     const t = translations[language] || translations[Language.ENGLISH];
+    const source = user ? 'in Google Tasks' : '';
     return (
         <Card className="mt-2 !p-3 bg-green-50 border-green-200 flex items-center gap-3">
             <div className="text-green-600">{ICONS.check}</div>
             <div>
                 <p className="font-semibold text-sm text-green-600">{t.todoCompleted}</p>
                 <p className="text-text-primary line-through">{data.item}</p>
+                {source && <p className="text-xs text-green-500">{source}</p>}
             </div>
         </Card>
     );
 };
 
-const TodoRemovedCard: React.FC<{ data: NonNullable<ChatMessageType['todoRemoved']> }> = ({ data }) => {
+const TodoRemovedCard: React.FC<{ data: NonNullable<ChatMessageType['todoRemoved']>; user: GoogleUser | null }> = ({ data, user }) => {
     const { language } = useAppContext();
     const t = translations[language] || translations[Language.ENGLISH];
+     const source = user ? 'from Google Tasks' : '';
     return (
         <Card className="mt-2 !p-3 bg-gray-100 border-gray-200 flex items-center gap-3">
             <div className="text-secondary">{ICONS.trash}</div>
             <div>
                 <p className="font-semibold text-sm text-secondary">{t.todoRemoved}</p>
-                <p className="text-text-secondary">{data.item}</p>
+                <p className="text-text-secondary">{data.item} {source}</p>
             </div>
         </Card>
     );
 };
 
-const ReminderRemovedCard: React.FC<{ data: NonNullable<ChatMessageType['reminderRemoved']> }> = ({ data }) => {
+const ReminderRemovedCard: React.FC<{ data: NonNullable<ChatMessageType['reminderRemoved']>; user: GoogleUser | null }> = ({ data, user }) => {
     const { language } = useAppContext();
     const t = translations[language] || translations[Language.ENGLISH];
     return (
@@ -147,24 +150,34 @@ const ReminderRemovedCard: React.FC<{ data: NonNullable<ChatMessageType['reminde
     );
 };
 
-const CalendarEventCard: React.FC<{ data: CalendarEvent }> = ({ data }) => {
+const CalendarEventCard: React.FC<{ data: CalendarEvent; user: GoogleUser | null }> = ({ data, user }) => {
     const { language } = useAppContext();
     const t = translations[language] || translations[Language.ENGLISH];
+    const source = user ? 'via Google Calendar' : '';
     return (
         <Card className="mt-2 !p-3 bg-green-50 border-green-200">
-            <p className="font-semibold text-sm text-green-600 mb-1">{t.eventScheduled}</p>
-            <p className="text-text-primary"><strong>{data.title}</strong> at <strong>{data.time}</strong></p>
-            {data.attendees && data.attendees.length > 0 && <p className="text-xs text-secondary">Attendees: {data.attendees.join(', ')}</p>}
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="font-semibold text-sm text-green-600 mb-1">{t.eventScheduled}</p>
+                <p className="text-text-primary"><strong>{data.title}</strong> at <strong>{data.time}</strong></p>
+                {data.attendees && data.attendees.length > 0 && <p className="text-xs text-secondary">Attendees: {data.attendees.join(', ')}</p>}
+              </div>
+              {source && <p className="text-xs text-green-700 bg-green-200 px-1.5 py-0.5 rounded-full">{source}</p>}
+            </div>
         </Card>
     );
 };
 
-const EmailCard: React.FC<{ data: DraftEmail }> = ({ data }) => {
+const EmailCard: React.FC<{ data: DraftEmail; user: GoogleUser | null }> = ({ data, user }) => {
     const { language } = useAppContext();
     const t = translations[language] || translations[Language.ENGLISH];
+    const source = user ? 'via Gmail' : '';
     return (
         <Card className="mt-2 text-sm !p-4 bg-background border-border-color">
-            <h4 className="font-bold text-md text-text-primary mb-3">{t.emailDraft}</h4>
+            <div className="flex justify-between items-start mb-3">
+                <h4 className="font-bold text-md text-text-primary">{t.emailDraft}</h4>
+                {source && <p className="text-xs text-secondary bg-gray-200 px-1.5 py-0.5 rounded-full">{source}</p>}
+            </div>
             <div className="space-y-2 text-text-secondary">
                 <p><strong>{t.to}</strong> {data.to}</p>
                 <p><strong>{t.subject}</strong> {data.subject}</p>
@@ -251,7 +264,7 @@ const getSentimentIcon = (sentiment?: Sentiment) => {
   return <span title={title} className={className}>{icon}</span>;
 };
 
-const ChatMessage: React.FC<{ message: ChatMessageType, onSendMessage: (prompt: string) => void; }> = ({ message, onSendMessage }) => {
+const ChatMessage: React.FC<{ message: ChatMessageType, onSendMessage: (prompt: string) => void; user: GoogleUser | null; }> = ({ message, onSendMessage, user }) => {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
 
@@ -270,7 +283,7 @@ const ChatMessage: React.FC<{ message: ChatMessageType, onSendMessage: (prompt: 
   return (
     <div className={`group flex items-end gap-2 animate-fadeIn ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isUser ? 'bg-primary text-white' : 'bg-gray-200 text-text-primary'}`}>
-          {isUser ? 'U' : 'L'}
+          {isUser ? user ? user.name.charAt(0).toUpperCase() : 'U' : 'L'}
       </div>
       <div className={`max-w-2xl rounded-xl p-1 ${bubbleClasses}`}>
         <div className="px-3 py-1 space-y-2">
@@ -283,13 +296,13 @@ const ChatMessage: React.FC<{ message: ChatMessageType, onSendMessage: (prompt: 
             {renderTextContent(message.content)}
             {message.invoiceData && <InvoiceCard data={message.invoiceData} />}
             {message.fileSearchResult && <FileSearchResultCard data={message.fileSearchResult} />}
-            {message.reminder && <ReminderCard data={message.reminder} />}
-            {message.todo && <TodoCard data={message.todo} />}
-            {message.draftEmail && <EmailCard data={message.draftEmail} />}
-            {message.calendarEvent && <CalendarEventCard data={message.calendarEvent} />}
-            {message.todoToggled && <TodoToggledCard data={message.todoToggled} />}
-            {message.todoRemoved && <TodoRemovedCard data={message.todoRemoved} />}
-            {message.reminderRemoved && <ReminderRemovedCard data={message.reminderRemoved} />}
+            {message.reminder && <ReminderCard data={message.reminder} user={user} />}
+            {message.todo && <TodoCard data={message.todo} user={user} />}
+            {message.draftEmail && <EmailCard data={message.draftEmail} user={user} />}
+            {message.calendarEvent && <CalendarEventCard data={message.calendarEvent} user={user} />}
+            {message.todoToggled && <TodoToggledCard data={message.todoToggled} user={user} />}
+            {message.todoRemoved && <TodoRemovedCard data={message.todoRemoved} user={user} />}
+            {message.reminderRemoved && <ReminderRemovedCard data={message.reminderRemoved} user={user} />}
             {message.breakTimer && <BreakTimerCard duration={message.breakTimer.durationSeconds} />}
             {message.interactiveChoice && <InteractiveChoiceCard data={message.interactiveChoice} onSendMessage={onSendMessage} />}
         </div>

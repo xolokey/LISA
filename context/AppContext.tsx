@@ -1,6 +1,7 @@
 
-import React, { createContext, useState, useContext, ReactNode, useCallback } from 'react';
-import { Language, UserPreferences, Persona, Reminder, TodoItem, CalendarEvent } from '../types';
+import React, { createContext, useState, useContext, ReactNode, useCallback, useEffect } from 'react';
+import { Language, UserPreferences, Persona, Reminder, TodoItem, CalendarEvent, GoogleUser, ChatSession, ChatMessage } from '../types';
+import { generateChatResponse, getGreeting, analyzeSentiment, generateChatTitle } from '../services/geminiService';
 
 interface AppContextType {
   language: Language;
@@ -20,6 +21,18 @@ interface AppContextType {
   addCalendarEvent: (event: Omit<CalendarEvent, 'id'>) => void;
   removeCalendarEvent: (id: string) => void;
   agendaHistory: CalendarEvent[];
+  user: GoogleUser | null;
+  signIn: () => void;
+  signOut: () => void;
+  // New Session Management
+  sessions: ChatSession[];
+  activeSessionId: string | null;
+  activeSession: ChatSession | null;
+  createNewChat: () => void;
+  setActiveSession: (sessionId: string) => void;
+  deleteSession: (sessionId: string) => void;
+  sendMessage: (prompt: string, file?: File) => Promise<void>;
+  isSendingMessage: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -30,7 +43,6 @@ const initialEvents: CalendarEvent[] = [
     { id: '3', title: 'Client Call', time: '03:30 PM' },
 ];
 
-// Create some mock history data for the same day in previous months
 const today = new Date();
 const currentDay = today.getDate();
 const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, currentDay);
@@ -43,6 +55,11 @@ const initialHistory: CalendarEvent[] = [
     { id: 'h4', title: 'Marketing Brainstorm', time: '11:30 AM', date: twoMonthsAgo.toISOString().split('T')[0] },
 ];
 
+const mockUser: GoogleUser = {
+    name: 'Alex Doe',
+    email: 'alex.doe@example.com',
+    picture: `https://i.pravatar.cc/150?u=alexdoe`,
+};
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>(Language.ENGLISH);
@@ -55,7 +72,175 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   ]);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(initialEvents);
   const [agendaHistory] = useState<CalendarEvent[]>(initialHistory);
+  const [user, setUser] = useState<GoogleUser | null>(null);
 
+  // --- New Session State ---
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const voiceEnabledRef = React.useRef(isVoiceOutputEnabled);
+  useEffect(() => { voiceEnabledRef.current = isVoiceOutputEnabled; }, [isVoiceOutputEnabled]);
+
+  // --- Persistence ---
+  useEffect(() => {
+    try {
+      const storedSessions = localStorage.getItem('chatSessions');
+      if (storedSessions) {
+        setSessions(JSON.parse(storedSessions));
+      }
+      const storedActiveId = localStorage.getItem('activeChatSessionId');
+      if (storedActiveId) {
+        setActiveSessionId(storedActiveId);
+      } else if (sessions.length > 0) {
+        setActiveSessionId(sessions[0].id);
+      }
+    } catch (error) {
+      console.error("Failed to load from local storage:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (sessions.length > 0) {
+      localStorage.setItem('chatSessions', JSON.stringify(sessions));
+    }
+    if (activeSessionId) {
+      localStorage.setItem('activeChatSessionId', activeSessionId);
+    }
+  }, [sessions, activeSessionId]);
+
+
+  const createNewChat = useCallback(async () => {
+    setIsSendingMessage(true); // Use this as a greeting loader
+    try {
+        const greetingText = await getGreeting(language, preferences.persona);
+        if (voiceEnabledRef.current) {
+          speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(greetingText);
+          utterance.lang = language;
+          speechSynthesis.speak(utterance);
+        }
+        const newSession: ChatSession = {
+            id: new Date().toISOString(),
+            title: "New Chat",
+            messages: [{ role: 'model', content: greetingText }],
+            createdAt: Date.now(),
+        };
+        setSessions(prev => [newSession, ...prev]);
+        setActiveSessionId(newSession.id);
+    } catch (error) {
+        console.error("Failed to create new chat:", error);
+        // Handle error, maybe create a chat with a fallback greeting
+    } finally {
+        setIsSendingMessage(false);
+    }
+  }, [language, preferences.persona]);
+  
+  // --- Initialize first chat if none exist ---
+  useEffect(() => {
+      const storedSessions = localStorage.getItem('chatSessions');
+      if (!storedSessions || JSON.parse(storedSessions).length === 0) {
+          createNewChat();
+      }
+  }, [createNewChat]);
+
+
+  const setActiveSession = useCallback((sessionId: string) => {
+    setActiveSessionId(sessionId);
+  }, []);
+
+  const deleteSession = useCallback((sessionId: string) => {
+    setSessions(prev => {
+      const newSessions = prev.filter(s => s.id !== sessionId);
+      if (activeSessionId === sessionId) {
+        if (newSessions.length > 0) {
+          setActiveSessionId(newSessions[0].id);
+        } else {
+          setActiveSessionId(null);
+          createNewChat(); // Create a new chat if the last one was deleted
+        }
+      }
+      if (newSessions.length === 0) localStorage.removeItem('chatSessions');
+      return newSessions;
+    });
+  }, [activeSessionId, createNewChat]);
+
+  const sendMessage = useCallback(async (prompt: string, file?: File) => {
+    if (!activeSessionId) return;
+
+    setIsSendingMessage(true);
+
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content: prompt,
+      ...(file && { fileInfo: { name: file.name, type: file.type } })
+    };
+    
+    // Add sentiment
+    try { userMessage.sentiment = await analyzeSentiment(prompt); } catch (e) { console.error(e) }
+
+    setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: [...s.messages, userMessage] } : s));
+    
+    // Generate Title for new chats
+    const isNewChat = sessions.find(s => s.id === activeSessionId)?.messages.filter(m => m.role === 'user').length === 1;
+    if (isNewChat) {
+      generateChatTitle(prompt).then(title => {
+        setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, title } : s));
+      });
+    }
+
+    try {
+      const currentSession = sessions.find(s => s.id === activeSessionId);
+      const history = currentSession?.messages.filter(m => typeof m.content === 'string').map(m => ({ role: m.role, parts: [{ text: m.content }] })) ?? [];
+
+      const response = await generateChatResponse(history, prompt, language, preferences.persona, !!user, file);
+
+      // Handle tool-call side effects
+      if (response.reminder) addReminder(response.reminder);
+      if (response.todo) addTodo(response.todo);
+      if (response.calendarEvent) addCalendarEvent(response.calendarEvent);
+      if (response.todoToggled) {
+          const todoToToggle = todos.find(t => t.item.toLowerCase() === (response.todoToggled?.item ?? '').toLowerCase());
+          if (todoToToggle) toggleTodo(todoToToggle.id);
+      }
+      if (response.todoRemoved) {
+          const todoToRemove = todos.find(t => t.item.toLowerCase() === (response.todoRemoved?.item ?? '').toLowerCase());
+          if (todoToRemove) removeTodo(todoToRemove.id);
+      }
+      if (response.reminderRemoved) {
+          const reminderToRemove = reminders.find(r => r.task.toLowerCase() === (response.reminderRemoved?.task ?? '').toLowerCase());
+          if (reminderToRemove) removeReminder(reminderToRemove.id);
+      }
+
+      if (voiceEnabledRef.current && response.content) {
+        speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(response.content);
+        utterance.lang = language;
+        speechSynthesis.speak(utterance);
+      }
+
+      const modelMessage: ChatMessage = { role: 'model', ...response, content: response.content ?? '' };
+      setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: [...s.messages, modelMessage] } : s));
+
+    } catch (error) {
+      console.error("Error sending message:", error);
+      const errorMessageText = "Sorry, I couldn't process that. Please try again.";
+      if (voiceEnabledRef.current) {
+        const utterance = new SpeechSynthesisUtterance(errorMessageText);
+        utterance.lang = language;
+        speechSynthesis.speak(utterance);
+      }
+      const errorModelMessage: ChatMessage = { role: 'model', content: errorMessageText };
+       setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: [...s.messages, errorModelMessage] } : s));
+    } finally {
+      setIsSendingMessage(false);
+    }
+
+  }, [activeSessionId, sessions, language, preferences.persona, user]);
+
+  const activeSession = sessions.find(s => s.id === activeSessionId) ?? null;
+
+  const signIn = useCallback(() => setUser(mockUser), []);
+  const signOut = useCallback(() => setUser(null), []);
 
   const toggleVoiceOutput = () => {
     setIsVoiceOutputEnabled(prev => {
@@ -103,6 +288,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         todos, addTodo, toggleTodo, removeTodo,
         calendarEvents, addCalendarEvent, removeCalendarEvent,
         agendaHistory,
+        user, signIn, signOut,
+        sessions, activeSessionId, activeSession,
+        createNewChat, setActiveSession, deleteSession,
+        sendMessage, isSendingMessage,
     }}>
       {children}
     </AppContext.Provider>

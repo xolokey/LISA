@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import ChatAssistant from './ChatAssistant'; 
 import { useAppContext } from '../context/AppContext';
@@ -21,7 +20,7 @@ const generateTimeSlots = () => {
 const timeSlots = generateTimeSlots();
 
 const AgendaWidget: React.FC = () => {
-    const { calendarEvents, addCalendarEvent, removeCalendarEvent } = useAppContext();
+    const { user, calendarEvents, addCalendarEvent, removeCalendarEvent } = useAppContext();
     const [newEventTitle, setNewEventTitle] = useState('');
     const [newEventTime, setNewEventTime] = useState('09:00 AM');
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
@@ -34,13 +33,15 @@ const AgendaWidget: React.FC = () => {
             setNewEventTime('09:00 AM');
         }
     };
+    
+    const widgetTitle = user ? 'Google Calendar' : "Today's Agenda";
 
     return (
         <>
             <Card className="!p-0 overflow-hidden flex flex-col">
                 <div className="p-4 border-b border-border-color flex justify-between items-center">
                     <h3 className="font-semibold text-text-primary flex items-center gap-2">
-                        {ICONS.calendar} Today's Agenda
+                        {ICONS.calendar} {widgetTitle}
                     </h3>
                     <button 
                         onClick={() => setIsHistoryModalOpen(true)}
@@ -104,8 +105,9 @@ const AgendaWidget: React.FC = () => {
 };
 
 const TodoWidget: React.FC = () => {
-    const { todos, addTodo, toggleTodo, removeTodo } = useAppContext();
+    const { user, todos, addTodo, toggleTodo, removeTodo } = useAppContext();
     const [newTodo, setNewTodo] = useState('');
+    const widgetTitle = user ? 'Google Tasks' : 'To-Do List';
 
     const handleAddTodo = (e: React.FormEvent) => {
         e.preventDefault();
@@ -119,7 +121,7 @@ const TodoWidget: React.FC = () => {
         <Card className="!p-0 overflow-hidden flex flex-col">
             <div className="p-4 border-b border-border-color">
                 <h3 className="font-semibold text-text-primary flex items-center gap-2">
-                    {ICONS.todo} To-Do List
+                    {ICONS.todo} {widgetTitle}
                 </h3>
             </div>
             <div className="p-4 space-y-2 text-sm max-h-48 overflow-y-auto flex-grow">
