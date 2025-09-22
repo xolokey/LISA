@@ -63,7 +63,7 @@ const mockUser: GoogleUser = {
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>(Language.ENGLISH);
-  const [isVoiceOutputEnabled, setIsVoiceOutputEnabled] = useState(true);
+  const [isVoiceOutputEnabled, setIsVoiceOutputEnabled] = useState(false);
   const [preferences, setPreferences] = useState<UserPreferences>({ persona: 'Neutral' });
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [todos, setTodos] = useState<TodoItem[]>([
