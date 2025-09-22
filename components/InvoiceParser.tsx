@@ -194,20 +194,20 @@ const InvoiceParser: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
       <Card>
-        <h2 className="text-2xl font-bold mb-2 text-text-primary">{t.title}</h2>
-        <p className="text-text-secondary mb-6">{t.description}</p>
+        <h2 className="text-2xl font-bold mb-2 text-text-primary dark:text-dark-text-primary">{t.title}</h2>
+        <p className="text-text-secondary dark:text-dark-text-secondary mb-6">{t.description}</p>
         
         <div className="space-y-4">
           <div className="flex items-center justify-center w-full">
-            <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-64 border-2 border-border-color border-dashed rounded-lg cursor-pointer bg-background hover:bg-gray-50 transition-colors">
+            <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-64 border-2 border-border-color dark:border-dark-border-color border-dashed rounded-lg cursor-pointer bg-background dark:bg-dark-background hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                     {previewUrl ? (
                          <img src={previewUrl} alt="Invoice preview" className="rounded-md max-h-48 w-auto" />
                     ): (
                         <>
-                         <div className="text-primary mb-4">{ICONS.upload}</div>
-                         <p className="mb-2 text-sm text-text-secondary"><span className="font-semibold text-text-primary">{t.uploadPrompt}</span></p>
-                         <p className="text-xs text-secondary">PNG, JPG, WEBP, HEIC, or HEIF</p>
+                         <div className="text-primary dark:text-dark-primary mb-4">{ICONS.upload}</div>
+                         <p className="mb-2 text-sm text-text-secondary dark:text-dark-text-secondary"><span className="font-semibold text-text-primary dark:text-dark-text-primary">{t.uploadPrompt}</span></p>
+                         <p className="text-xs text-secondary dark:text-dark-secondary">PNG, JPG, WEBP, HEIC, or HEIF</p>
                         </>
                     )}
                 </div>
@@ -216,7 +216,7 @@ const InvoiceParser: React.FC = () => {
         </div>
         
           <button onClick={handleParse} disabled={!selectedFile || isLoading} title={t.button}
-            className="w-full bg-primary text-white font-semibold py-3 px-4 rounded-lg hover:bg-primary-hover transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex justify-center items-center"
+            className="w-full bg-primary text-white font-semibold py-3 px-4 rounded-lg hover:bg-primary-hover transition-colors disabled:bg-gray-400 dark:disabled:bg-slate-600 disabled:cursor-not-allowed flex justify-center items-center"
           >
             {isLoading ? <Spinner className="h-6 w-6 border-white" /> : t.button}
           </button>
@@ -228,22 +228,22 @@ const InvoiceParser: React.FC = () => {
       <Card className={`transition-all duration-300 ${!invoiceData && !isLoading ? 'flex items-center justify-center' : ''}`}>
         {isLoading ? <div className="flex justify-center items-center h-full"><Spinner className="h-12 w-12 border-primary" /></div> : invoiceData ? (
           <div className="animate-fadeIn">
-            <h3 className="text-2xl font-bold mb-4 text-text-primary">{t.extractedData}</h3>
-            <div className="grid grid-cols-2 gap-4 text-text-secondary mb-4">
-                <div><strong className="text-text-primary">{t.invoiceId}</strong> <p>{invoiceData.invoiceId || 'N/A'}</p></div>
-                <div><strong className="text-text-primary">{t.date}</strong> <p>{invoiceData.invoiceDate || 'N/A'}</p></div>
-                <div><strong className="text-text-primary">{t.vendor}</strong> <p>{invoiceData.vendorName || 'N/A'}</p></div>
-                <div><strong className="text-text-primary">{t.customer}</strong> <p>{invoiceData.customerName || 'N/A'}</p></div>
+            <h3 className="text-2xl font-bold mb-4 text-text-primary dark:text-dark-text-primary">{t.extractedData}</h3>
+            <div className="grid grid-cols-2 gap-4 text-text-secondary dark:text-dark-text-secondary mb-4">
+                <div><strong className="text-text-primary dark:text-dark-text-primary">{t.invoiceId}</strong> <p>{invoiceData.invoiceId || 'N/A'}</p></div>
+                <div><strong className="text-text-primary dark:text-dark-text-primary">{t.date}</strong> <p>{invoiceData.invoiceDate || 'N/A'}</p></div>
+                <div><strong className="text-text-primary dark:text-dark-text-primary">{t.vendor}</strong> <p>{invoiceData.vendorName || 'N/A'}</p></div>
+                <div><strong className="text-text-primary dark:text-dark-text-primary">{t.customer}</strong> <p>{invoiceData.customerName || 'N/A'}</p></div>
             </div>
-            <div className="bg-background p-4 rounded-lg my-4 border border-border-color">
-                <p className="text-lg font-bold text-text-primary"><strong>{t.totalAmount}</strong></p>
-                <p className="text-3xl font-bold text-primary">{invoiceData.totalAmount?.toFixed(2) || '0.00'}</p>
+            <div className="bg-background dark:bg-dark-background p-4 rounded-lg my-4 border border-border-color dark:border-dark-border-color">
+                <p className="text-lg font-bold text-text-primary dark:text-dark-text-primary"><strong>{t.totalAmount}</strong></p>
+                <p className="text-3xl font-bold text-primary dark:text-dark-primary">{invoiceData.totalAmount?.toFixed(2) || '0.00'}</p>
             </div>
             <div>
-                <h4 className="font-semibold text-lg mb-2 text-text-primary">{t.items}</h4>
-                <div className="overflow-x-auto max-h-60 border border-border-color rounded-lg">
+                <h4 className="font-semibold text-lg mb-2 text-text-primary dark:text-dark-text-primary">{t.items}</h4>
+                <div className="overflow-x-auto max-h-60 border border-border-color dark:border-dark-border-color rounded-lg">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-background text-text-secondary sticky top-0">
+                        <thead className="bg-background dark:bg-dark-background text-text-secondary dark:text-dark-text-secondary sticky top-0">
                             <tr>
                                 <th className="px-4 py-2">{t.itemDescription}</th>
                                 <th className="px-4 py-2 text-center">{t.itemQty}</th>
@@ -251,13 +251,13 @@ const InvoiceParser: React.FC = () => {
                                 <th className="px-4 py-2 text-right">{t.itemTotal}</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-border-color">
+                        <tbody className="divide-y divide-border-color dark:divide-dark-border-color">
                             {invoiceData.items?.map((item, index) => (
-                                <tr key={index} className="hover:bg-gray-50">
+                                <tr key={index} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
                                     <td className="px-4 py-2">{item.description}</td>
                                     <td className="px-4 py-2 text-center">{item.quantity}</td>
                                     <td className="px-4 py-2 text-right">{item.unitPrice?.toFixed(2)}</td>
-                                    <td className="px-4 py-2 text-right font-medium text-text-primary">{item.total?.toFixed(2)}</td>
+                                    <td className="px-4 py-2 text-right font-medium text-text-primary dark:text-dark-text-primary">{item.total?.toFixed(2)}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -266,7 +266,7 @@ const InvoiceParser: React.FC = () => {
             </div>
           </div>
         ) : (
-          <p className="text-secondary text-center">{t.placeholder}</p>
+          <p className="text-secondary dark:text-dark-secondary text-center">{t.placeholder}</p>
         )}
       </Card>
     </div>

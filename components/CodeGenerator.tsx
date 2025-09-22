@@ -169,20 +169,20 @@ const CodeGenerator: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto" onDragEnter={handleDragEvents} onDragOver={handleDragEvents} onDragLeave={handleDragEvents} onDrop={handleDrop}>
       <Card>
-        <h2 className="text-2xl font-bold mb-2 text-text-primary">{t.title}</h2>
-        <p className="text-text-secondary mb-6">{t.description}</p>
+        <h2 className="text-2xl font-bold mb-2 text-text-primary dark:text-dark-text-primary">{t.title}</h2>
+        <p className="text-text-secondary dark:text-dark-text-secondary mb-6">{t.description}</p>
         
         <div className="space-y-4">
           <div className="relative">
             <textarea
               value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder={t.placeholder}
-              className="w-full h-28 p-3 bg-background border border-border-color rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-text-primary pr-12"
+              className="w-full h-28 p-3 bg-background dark:bg-dark-background border border-border-color dark:border-dark-border-color rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-text-primary dark:text-dark-text-primary pr-12"
               disabled={isLoading}
             />
             {hasRecognitionSupport && (
               <div className="absolute top-3 right-3 flex flex-col items-center">
                  <button onClick={() => isListening ? stopListening() : startListening()} title={isListening ? 'Stop listening' : 'Start voice input'}
-                  className={`p-2 rounded-full transition-colors ${isListening ? 'bg-red-100 text-red-600 animate-pulse' : 'hover:bg-gray-100 text-secondary'}`} disabled={isLoading}>
+                  className={`p-2 rounded-full transition-colors ${isListening ? 'bg-red-100 text-red-600 animate-pulse' : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-secondary dark:text-dark-secondary'}`} disabled={isLoading}>
                   {isListening ? ICONS.stop : ICONS.microphone}
                 </button>
               </div>
@@ -191,23 +191,23 @@ const CodeGenerator: React.FC = () => {
 
           <div 
             onClick={() => fileInputRef.current?.click()}
-            className={`flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${isDragOver ? 'border-primary bg-teal-50' : 'border-border-color hover:bg-gray-50'}`}
+            className={`flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${isDragOver ? 'border-primary bg-teal-50 dark:bg-teal-500/10' : 'border-border-color dark:border-dark-border-color hover:bg-gray-50 dark:hover:bg-slate-700/50'}`}
             >
               <input type="file" multiple ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-              <div className="text-primary mb-2">{ICONS.upload}</div>
-              <p className="text-text-primary font-semibold">{t.uploadButton}</p>
+              <div className="text-primary dark:text-dark-primary mb-2">{ICONS.upload}</div>
+              <p className="text-text-primary dark:text-dark-text-primary font-semibold">{t.uploadButton}</p>
           </div>
           
           {files.length > 0 && (
             <div>
-              <h4 className="text-sm font-semibold text-text-secondary mb-2">{t.contextFiles}</h4>
+              <h4 className="text-sm font-semibold text-text-secondary dark:text-dark-text-secondary mb-2">{t.contextFiles}</h4>
               <div className="flex flex-wrap gap-2">
                 {files.map((file, index) => (
-                  <div key={index} className="bg-gray-100 rounded-full px-3 py-1 text-sm text-text-secondary flex items-center gap-2 border border-border-color">
-                    {fileStatuses[file.name + file.lastModified] === 'processing' && <Spinner className="h-4 w-4 border-gray-400"/>}
+                  <div key={index} className="bg-gray-100 dark:bg-slate-700 rounded-full px-3 py-1 text-sm text-text-secondary dark:text-dark-text-secondary flex items-center gap-2 border border-border-color dark:border-dark-border-color">
+                    {fileStatuses[file.name + file.lastModified] === 'processing' && <Spinner className="h-4 w-4 border-gray-400 dark:border-slate-500"/>}
                     {fileStatuses[file.name + file.lastModified] === 'success' && <div className="text-green-500">{ICONS.check}</div>}
                     <span>{file.name}</span>
-                    <button onClick={() => removeFile(file)} className="text-gray-400 hover:text-text-primary" title={`Remove ${file.name}`}>
+                    <button onClick={() => removeFile(file)} className="text-gray-400 dark:text-slate-400 hover:text-text-primary dark:hover:text-dark-text-primary" title={`Remove ${file.name}`}>
                       {ICONS.close}
                     </button>
                   </div>
@@ -217,7 +217,7 @@ const CodeGenerator: React.FC = () => {
           )}
 
           <button onClick={handleGenerate} disabled={isLoading || !prompt.trim()}
-            className="w-full bg-primary text-white font-semibold py-3 px-4 rounded-lg hover:bg-primary-hover transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex justify-center items-center"
+            className="w-full bg-primary text-white font-semibold py-3 px-4 rounded-lg hover:bg-primary-hover transition-colors disabled:bg-gray-400 dark:disabled:bg-slate-600 disabled:cursor-not-allowed flex justify-center items-center"
           >
             {isLoading ? <Spinner className="h-6 w-6 border-white" /> : t.button}
           </button>
@@ -227,7 +227,7 @@ const CodeGenerator: React.FC = () => {
         
         {generatedCode && (
           <div className="mt-6 animate-fadeIn">
-            <h3 className="text-xl font-semibold text-text-primary">{t.generatedCode}</h3>
+            <h3 className="text-xl font-semibold text-text-primary dark:text-dark-text-primary">{t.generatedCode}</h3>
             <CodeBlock code={generatedCode} />
           </div>
         )}

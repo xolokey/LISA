@@ -14,7 +14,7 @@ const LanguageSelector: React.FC = () => {
       <select
         value={language}
         onChange={handleLanguageChange}
-        className="bg-background border border-border-color text-text-secondary text-sm rounded-lg focus:ring-2 focus:ring-primary focus:border-primary focus:outline-none block w-full pl-3 pr-10 py-2 appearance-none transition-all"
+        className="bg-background dark:bg-dark-surface border border-border-color dark:border-dark-border-color text-text-secondary dark:text-dark-text-secondary text-sm rounded-lg focus:ring-2 focus:ring-primary focus:border-primary focus:outline-none block w-full pl-3 pr-10 py-2 appearance-none transition-all"
         aria-label="Select language"
       >
         <option value={Language.ENGLISH}>English</option>
@@ -25,7 +25,7 @@ const LanguageSelector: React.FC = () => {
         <option value={Language.GERMAN}>Deutsch (German)</option>
         <option value={Language.JAPANESE}>日本語 (Japanese)</option>
       </select>
-      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-secondary">
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-secondary dark:text-dark-secondary">
         <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
       </div>
     </div>

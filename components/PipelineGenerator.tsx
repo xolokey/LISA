@@ -136,22 +136,22 @@ const PipelineGenerator: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto">
       <Card>
-        <h2 className="text-2xl font-bold mb-2 text-text-primary">{t.title}</h2>
-        <p className="text-text-secondary mb-6">{t.description}</p>
+        <h2 className="text-2xl font-bold mb-2 text-text-primary dark:text-dark-text-primary">{t.title}</h2>
+        <p className="text-text-secondary dark:text-dark-text-secondary mb-6">{t.description}</p>
         
         <div className="space-y-6">
           <div>
-            <label htmlFor="projectName" className="block text-sm font-medium text-text-secondary mb-2">{t.projectNameLabel}</label>
+            <label htmlFor="projectName" className="block text-sm font-medium text-text-secondary dark:text-dark-text-secondary mb-2">{t.projectNameLabel}</label>
             <div className="relative">
               <input id="projectName" type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)}
                 placeholder={t.projectNamePlaceholder}
-                className="w-full p-3 bg-background border border-border-color rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-text-primary pr-10"
+                className="w-full p-3 bg-background dark:bg-dark-background border border-border-color dark:border-dark-border-color rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-text-primary dark:text-dark-text-primary pr-10"
                 disabled={isLoading}
               />
               {hasRecognitionSupport && (
                   <div className="absolute inset-y-0 right-0 flex items-center pr-2">
                        <button onClick={() => isListening ? stopListening() : startListening()} title={isListening ? 'Stop listening' : 'Start voice input'}
-                          className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-secondary hover:text-primary'}`}>
+                          className={`p-2 rounded-full transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-secondary dark:text-dark-secondary hover:text-primary'}`}>
                           {isListening ? ICONS.stop : ICONS.microphone}
                       </button>
                   </div>
@@ -159,20 +159,20 @@ const PipelineGenerator: React.FC = () => {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">{t.pipelineTypeLabel}</label>
-            <div className="flex space-x-2 bg-background p-1 rounded-lg border border-border-color">
+            <label className="block text-sm font-medium text-text-secondary dark:text-dark-text-secondary mb-2">{t.pipelineTypeLabel}</label>
+            <div className="flex space-x-2 bg-background dark:bg-dark-background p-1 rounded-lg border border-border-color dark:border-dark-border-color">
               <button onClick={() => setPipelineType('github')} disabled={isLoading} title="Generate for GitHub Actions"
-                className={`flex-1 py-2 px-4 rounded-md transition-all text-sm font-semibold ${pipelineType === 'github' ? 'bg-primary text-white shadow' : 'text-text-secondary hover:bg-gray-100'}`}>
+                className={`flex-1 py-2 px-4 rounded-md transition-all text-sm font-semibold ${pipelineType === 'github' ? 'bg-primary text-white shadow' : 'text-text-secondary dark:text-dark-text-secondary hover:bg-gray-100 dark:hover:bg-slate-700'}`}>
                 {t.githubActions}
               </button>
               <button onClick={() => setPipelineType('azure')} disabled={isLoading} title="Generate for Azure DevOps"
-                className={`flex-1 py-2 px-4 rounded-md transition-all text-sm font-semibold ${pipelineType === 'azure' ? 'bg-primary text-white shadow' : 'text-text-secondary hover:bg-gray-100'}`}>
+                className={`flex-1 py-2 px-4 rounded-md transition-all text-sm font-semibold ${pipelineType === 'azure' ? 'bg-primary text-white shadow' : 'text-text-secondary dark:text-dark-text-secondary hover:bg-gray-100 dark:hover:bg-slate-700'}`}>
                 {t.azureDevops}
               </button>
             </div>
           </div>
           <button onClick={handleGenerate} disabled={isLoading || !projectName} title={t.button}
-            className="w-full bg-primary text-white font-semibold py-3 px-4 rounded-lg hover:bg-primary-hover transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex justify-center items-center"
+            className="w-full bg-primary text-white font-semibold py-3 px-4 rounded-lg hover:bg-primary-hover transition-colors disabled:bg-gray-400 dark:disabled:bg-slate-600 disabled:cursor-not-allowed flex justify-center items-center"
           >
             {isLoading ? <Spinner className="h-6 w-6 border-white"/> : t.button}
           </button>
@@ -182,7 +182,7 @@ const PipelineGenerator: React.FC = () => {
         
         {generatedYaml && (
           <div className="mt-6 animate-fadeIn">
-            <h3 className="text-xl font-semibold text-text-primary">{t.generatedYaml}</h3>
+            <h3 className="text-xl font-semibold text-text-primary dark:text-dark-text-primary">{t.generatedYaml}</h3>
             <CodeBlock code={generatedYaml} />
           </div>
         )}

@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import ChatAssistant from './ChatAssistant'; 
 import { useAppContext } from '../context/AppContext';
@@ -39,14 +40,14 @@ const AgendaWidget: React.FC = () => {
     return (
         <>
             <Card className="!p-0 overflow-hidden flex flex-col">
-                <div className="p-4 border-b border-border-color flex justify-between items-center">
-                    <h3 className="font-semibold text-text-primary flex items-center gap-2">
+                <div className="p-4 border-b border-border-color dark:border-dark-border-color flex justify-between items-center">
+                    <h3 className="font-semibold text-text-primary dark:text-dark-text-primary flex items-center gap-2">
                         {ICONS.calendar} {widgetTitle}
                     </h3>
                     <button 
                         onClick={() => setIsHistoryModalOpen(true)}
                         title="View agenda history"
-                        className="text-secondary hover:text-primary transition-colors"
+                        className="text-secondary dark:text-dark-secondary hover:text-primary dark:hover:text-dark-primary transition-colors"
                     >
                         {ICONS.history}
                     </button>
@@ -54,32 +55,32 @@ const AgendaWidget: React.FC = () => {
                 <div className="p-4 space-y-3 text-sm max-h-48 overflow-y-auto flex-grow">
                     {calendarEvents.length > 0 ? calendarEvents.map(event => (
                         <div key={event.id} className="flex items-start group">
-                            <div className="font-semibold text-primary w-20 shrink-0">{event.time}</div>
-                            <div className="text-text-secondary flex-grow">
-                                <p className="font-medium text-text-primary">{event.title}</p>
+                            <div className="font-semibold text-primary dark:text-dark-primary w-20 shrink-0">{event.time}</div>
+                            <div className="text-text-secondary dark:text-dark-text-secondary flex-grow">
+                                <p className="font-medium text-text-primary dark:text-dark-text-primary">{event.title}</p>
                                 {event.attendees && <p className="text-xs">With: {event.attendees.join(', ')}</p>}
                             </div>
-                            <button onClick={() => removeCalendarEvent(event.id)} className="text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity ml-2 shrink-0">
+                            <button onClick={() => removeCalendarEvent(event.id)} className="text-secondary dark:text-dark-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity ml-2 shrink-0">
                                 {ICONS.close}
                             </button>
                         </div>
                     )) : (
-                        <div className="text-secondary text-center h-full flex items-center justify-center">No events scheduled.</div>
+                        <div className="text-secondary dark:text-dark-secondary text-center h-full flex items-center justify-center">No events scheduled.</div>
                     )}
                 </div>
-                <form onSubmit={handleAddEvent} className="p-4 border-t border-border-color bg-surface">
+                <form onSubmit={handleAddEvent} className="p-4 border-t border-border-color dark:border-dark-border-color bg-surface dark:bg-dark-surface">
                     <div className="flex gap-2">
                         <div className="relative w-28">
                             <select
                                 value={newEventTime}
                                 onChange={(e) => setNewEventTime(e.target.value)}
-                                className="w-full bg-background border border-border-color rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary appearance-none pr-8"
+                                className="w-full bg-background dark:bg-dark-background border border-border-color dark:border-dark-border-color rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary appearance-none pr-8"
                             >
                                 {timeSlots.map(time => (
                                     <option key={time} value={time}>{time}</option>
                                 ))}
                             </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-secondary">
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-secondary dark:text-dark-secondary">
                                 <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
                             </div>
                         </div>
@@ -88,9 +89,9 @@ const AgendaWidget: React.FC = () => {
                             value={newEventTitle}
                             onChange={(e) => setNewEventTitle(e.target.value)}
                             placeholder="New event title..."
-                            className="flex-grow bg-background border border-border-color rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                            className="flex-grow bg-background dark:bg-dark-background border border-border-color dark:border-dark-border-color rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                         />
-                        <button type="submit" className="bg-primary text-white rounded-md px-3 text-sm font-semibold hover:bg-primary-hover disabled:bg-gray-300" disabled={!newEventTitle.trim() || !newEventTime.trim()}>
+                        <button type="submit" className="bg-primary text-white rounded-md px-3 text-sm font-semibold hover:bg-primary-hover disabled:bg-gray-400 dark:disabled:bg-slate-600" disabled={!newEventTitle.trim() || !newEventTime.trim()}>
                             Add
                         </button>
                     </div>
@@ -119,8 +120,8 @@ const TodoWidget: React.FC = () => {
 
     return (
         <Card className="!p-0 overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-border-color">
-                <h3 className="font-semibold text-text-primary flex items-center gap-2">
+            <div className="p-4 border-b border-border-color dark:border-dark-border-color">
+                <h3 className="font-semibold text-text-primary dark:text-dark-text-primary flex items-center gap-2">
                     {ICONS.todo} {widgetTitle}
                 </h3>
             </div>
@@ -131,27 +132,27 @@ const TodoWidget: React.FC = () => {
                             type="checkbox" 
                             checked={todo.completed} 
                             onChange={() => toggleTodo(todo.id)}
-                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary mr-3 shrink-0"
+                            className="h-4 w-4 rounded border-gray-300 dark:border-slate-600 text-primary focus:ring-primary mr-3 shrink-0 bg-transparent dark:bg-transparent"
                         />
-                        <span className={`flex-grow ${todo.completed ? 'line-through text-secondary' : 'text-text-primary'}`}>{todo.item}</span>
-                        <button onClick={() => removeTodo(todo.id)} className="text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity ml-2 shrink-0">
+                        <span className={`flex-grow ${todo.completed ? 'line-through text-secondary dark:text-dark-secondary' : 'text-text-primary dark:text-dark-text-primary'}`}>{todo.item}</span>
+                        <button onClick={() => removeTodo(todo.id)} className="text-secondary dark:text-dark-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity ml-2 shrink-0">
                             {ICONS.close}
                         </button>
                     </div>
                 )) : (
-                    <div className="text-secondary text-center h-full flex items-center justify-center">Your to-do list is empty.</div>
+                    <div className="text-secondary dark:text-dark-secondary text-center h-full flex items-center justify-center">Your to-do list is empty.</div>
                 )}
             </div>
-            <form onSubmit={handleAddTodo} className="p-4 border-t border-border-color bg-surface">
+            <form onSubmit={handleAddTodo} className="p-4 border-t border-border-color dark:border-dark-border-color bg-surface dark:bg-dark-surface">
                  <div className="flex gap-2">
                     <input 
                         type="text" 
                         value={newTodo}
                         onChange={(e) => setNewTodo(e.target.value)}
                         placeholder="New to-do item..."
-                        className="flex-grow bg-background border border-border-color rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                        className="flex-grow bg-background dark:bg-dark-background border border-border-color dark:border-dark-border-color rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                     />
-                    <button type="submit" className="bg-primary text-white rounded-md px-3 text-sm font-semibold hover:bg-primary-hover disabled:bg-gray-300" disabled={!newTodo.trim()}>
+                    <button type="submit" className="bg-primary text-white rounded-md px-3 text-sm font-semibold hover:bg-primary-hover disabled:bg-gray-400 dark:disabled:bg-slate-600" disabled={!newTodo.trim()}>
                         Add
                     </button>
                 </div>
@@ -165,17 +166,17 @@ const RemindersWidget: React.FC = () => {
     if (reminders.length === 0) return null;
     return (
         <Card className="!p-0 overflow-hidden">
-             <div className="p-4 border-b border-border-color">
-                <h3 className="font-semibold text-text-primary">Reminders</h3>
+             <div className="p-4 border-b border-border-color dark:border-dark-border-color">
+                <h3 className="font-semibold text-text-primary dark:text-dark-text-primary">Reminders</h3>
             </div>
             <div className="p-4 space-y-2 text-sm max-h-48 overflow-y-auto">
                 {reminders.map(reminder => (
-                    <div key={reminder.id} className="flex items-center group bg-teal-50/50 p-2 rounded-md">
+                    <div key={reminder.id} className="flex items-center group bg-teal-50/50 dark:bg-teal-500/10 p-2 rounded-md">
                         <div className="flex-grow">
-                            <p className="font-semibold text-primary">{reminder.time}</p>
-                            <p className="text-text-secondary">{reminder.task}</p>
+                            <p className="font-semibold text-primary dark:text-dark-primary">{reminder.time}</p>
+                            <p className="text-text-secondary dark:text-dark-text-secondary">{reminder.task}</p>
                         </div>
-                        <button onClick={() => removeReminder(reminder.id)} className="text-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => removeReminder(reminder.id)} className="text-secondary dark:text-dark-secondary hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
                             {ICONS.close}
                         </button>
                     </div>

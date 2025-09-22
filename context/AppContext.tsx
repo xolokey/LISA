@@ -1,6 +1,7 @@
 
+
 import React, { createContext, useState, useContext, ReactNode, useCallback, useEffect } from 'react';
-import { Language, UserPreferences, Persona, Reminder, TodoItem, CalendarEvent, GoogleUser, ChatSession, ChatMessage } from '../types';
+import { Language, UserPreferences, Persona, Reminder, TodoItem, CalendarEvent, GoogleUser, ChatSession, ChatMessage, Theme } from '../types';
 import { generateChatResponse, getGreeting, analyzeSentiment, generateChatTitle } from '../services/geminiService';
 
 interface AppContextType {
@@ -9,7 +10,7 @@ interface AppContextType {
   isVoiceOutputEnabled: boolean;
   toggleVoiceOutput: () => void;
   preferences: UserPreferences;
-  setPreferences: (prefs: UserPreferences) => void;
+  setPreferences: (prefs: Partial<UserPreferences>) => void;
   reminders: Reminder[];
   addReminder: (reminder: Omit<Reminder, 'id'>) => void;
   removeReminder: (id: string) => void;
@@ -61,10 +62,46 @@ const mockUser: GoogleUser = {
     picture: `https://i.pravatar.cc/150?u=alexdoe`,
 };
 
+const defaultPreferences: UserPreferences = {
+  persona: 'Neutral',
+  theme: 'system',
+};
+
+const errorTranslations = {
+    [Language.ENGLISH]: {
+        quota: "I've reached my daily request limit for this model. Please try again tomorrow.",
+        generic: "Sorry, I couldn't process that. Please try again."
+    },
+    [Language.TAMIL]: {
+        quota: "இந்த மாடலுக்கான எனது தினசரி கோரிக்கை வரம்பை நான் அடைந்துவிட்டேன். தயவுசெய்து நாளை மீண்டும் முயற்சிக்கவும்.",
+        generic: "மன்னிக்கவும், அதைச் செயல்படுத்த முடியவில்லை. தயவுசெய்து மீண்டும் முயற்சிக்கவும்."
+    },
+    [Language.HINDI]: {
+        quota: "मैंने इस मॉडल के लिए अपनी दैनिक अनुरोध सीमा पूरी कर ली है। कृपया कल पुनः प्रयास करें।",
+        generic: "क्षमा करें, मैं उसे संसाधित नहीं कर सका। कृपया पुनः प्रयास करें।"
+    },
+    [Language.SPANISH]: {
+        quota: "He alcanzado mi límite diario de solicitudes para este modelo. Por favor, inténtalo de nuevo mañana.",
+        generic: "Lo siento, no pude procesar eso. Por favor, inténtalo de nuevo."
+    },
+    [Language.FRENCH]: {
+        quota: "J'ai atteint ma limite quotidienne de requêtes pour ce modèle. Veuillez réessayer demain.",
+        generic: "Désolé, je n'ai pas pu traiter cela. Veuillez réessayer."
+    },
+    [Language.GERMAN]: {
+        quota: "Ich habe mein tägliches Anfragelimit für dieses Modell erreicht. Bitte versuchen Sie es morgen erneut.",
+        generic: "Entschuldigung, ich konnte das nicht verarbeiten. Bitte versuchen Sie es erneut."
+    },
+    [Language.JAPANESE]: {
+        quota: "このモデルの1日のリクエスト上限に達しました。明日もう一度お試しください。",
+        generic: "申し訳ありませんが、処理できませんでした。もう一度お試しください。"
+    },
+};
+
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>(Language.ENGLISH);
   const [isVoiceOutputEnabled, setIsVoiceOutputEnabled] = useState(false);
-  const [preferences, setPreferences] = useState<UserPreferences>({ persona: 'Neutral' });
+  const [preferences, setCorePreferences] = useState<UserPreferences>(defaultPreferences);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [todos, setTodos] = useState<TodoItem[]>([
       { id: 't1', item: 'Finalize Q3 report', completed: false },
@@ -73,44 +110,65 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(initialEvents);
   const [agendaHistory] = useState<CalendarEvent[]>(initialHistory);
   const [user, setUser] = useState<GoogleUser | null>(null);
-
-  // --- New Session State ---
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const voiceEnabledRef = React.useRef(isVoiceOutputEnabled);
   useEffect(() => { voiceEnabledRef.current = isVoiceOutputEnabled; }, [isVoiceOutputEnabled]);
+  
+  // --- Theme Management ---
+  useEffect(() => {
+    const root = window.document.documentElement;
+    const isDark =
+      preferences.theme === 'dark' ||
+      (preferences.theme === 'system' &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches);
+    
+    root.classList.toggle('dark', isDark);
+  }, [preferences.theme]);
+
+  useEffect(() => {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = () => {
+          if (preferences.theme === 'system') {
+              const root = window.document.documentElement;
+              root.classList.toggle('dark', mediaQuery.matches);
+          }
+      };
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [preferences.theme]);
+
 
   // --- Persistence ---
   useEffect(() => {
     try {
       const storedSessions = localStorage.getItem('chatSessions');
-      if (storedSessions) {
-        setSessions(JSON.parse(storedSessions));
-      }
+      if (storedSessions) setSessions(JSON.parse(storedSessions));
+      
       const storedActiveId = localStorage.getItem('activeChatSessionId');
-      if (storedActiveId) {
-        setActiveSessionId(storedActiveId);
-      } else if (sessions.length > 0) {
-        setActiveSessionId(sessions[0].id);
-      }
+      if (storedActiveId) setActiveSessionId(storedActiveId);
+
+      const storedPrefs = localStorage.getItem('userPreferences');
+      if (storedPrefs) setCorePreferences(JSON.parse(storedPrefs));
+
     } catch (error) {
       console.error("Failed to load from local storage:", error);
     }
   }, []);
 
   useEffect(() => {
-    if (sessions.length > 0) {
-      localStorage.setItem('chatSessions', JSON.stringify(sessions));
-    }
-    if (activeSessionId) {
-      localStorage.setItem('activeChatSessionId', activeSessionId);
-    }
-  }, [sessions, activeSessionId]);
+    if (sessions.length > 0) localStorage.setItem('chatSessions', JSON.stringify(sessions));
+    if (activeSessionId) localStorage.setItem('activeChatSessionId', activeSessionId);
+    localStorage.setItem('userPreferences', JSON.stringify(preferences));
+  }, [sessions, activeSessionId, preferences]);
 
+  const setPreferences = (newPrefs: Partial<UserPreferences>) => {
+    setCorePreferences(prev => ({ ...prev, ...newPrefs }));
+  };
 
   const createNewChat = useCallback(async () => {
-    setIsSendingMessage(true); // Use this as a greeting loader
+    setIsSendingMessage(true);
     try {
         const greetingText = await getGreeting(language, preferences.persona);
         if (voiceEnabledRef.current) {
@@ -129,13 +187,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setActiveSessionId(newSession.id);
     } catch (error) {
         console.error("Failed to create new chat:", error);
-        // Handle error, maybe create a chat with a fallback greeting
     } finally {
         setIsSendingMessage(false);
     }
   }, [language, preferences.persona]);
   
-  // --- Initialize first chat if none exist ---
   useEffect(() => {
       const storedSessions = localStorage.getItem('chatSessions');
       if (!storedSessions || JSON.parse(storedSessions).length === 0) {
@@ -152,14 +208,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setSessions(prev => {
       const newSessions = prev.filter(s => s.id !== sessionId);
       if (activeSessionId === sessionId) {
-        if (newSessions.length > 0) {
-          setActiveSessionId(newSessions[0].id);
-        } else {
-          setActiveSessionId(null);
-          createNewChat(); // Create a new chat if the last one was deleted
-        }
+        setActiveSessionId(newSessions[0]?.id || null);
       }
-      if (newSessions.length === 0) localStorage.removeItem('chatSessions');
+      if (newSessions.length === 0) {
+        localStorage.removeItem('chatSessions');
+        createNewChat(); 
+      }
       return newSessions;
     });
   }, [activeSessionId, createNewChat]);
@@ -175,12 +229,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       ...(file && { fileInfo: { name: file.name, type: file.type } })
     };
     
-    // Add sentiment
     try { userMessage.sentiment = await analyzeSentiment(prompt); } catch (e) { console.error(e) }
 
     setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: [...s.messages, userMessage] } : s));
     
-    // Generate Title for new chats
     const isNewChat = sessions.find(s => s.id === activeSessionId)?.messages.filter(m => m.role === 'user').length === 1;
     if (isNewChat) {
       generateChatTitle(prompt).then(title => {
@@ -223,7 +275,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     } catch (error) {
       console.error("Error sending message:", error);
-      const errorMessageText = "Sorry, I couldn't process that. Please try again.";
+      
+      const t = errorTranslations[language] || errorTranslations[Language.ENGLISH];
+      let errorMessageText = t.generic;
+
+      const errorMessage = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+      if (errorMessage.includes('quota') || errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+        errorMessageText = t.quota;
+      }
+
       if (voiceEnabledRef.current) {
         const utterance = new SpeechSynthesisUtterance(errorMessageText);
         utterance.lang = language;

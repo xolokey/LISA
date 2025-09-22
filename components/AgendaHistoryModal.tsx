@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import Modal from './common/Modal';
 import { useAppContext } from '../context/AppContext';
@@ -39,7 +40,7 @@ const AgendaHistoryModal: React.FC<{ isOpen: boolean; onClose: () => void }> = (
         <Modal isOpen={isOpen} onClose={onClose} title={`Agenda History for day ${currentDay}`}>
             <div className="space-y-4">
                 <div>
-                    <label htmlFor="month-select" className="block text-sm font-medium text-text-secondary mb-2">
+                    <label htmlFor="month-select" className="block text-sm font-medium text-text-secondary dark:text-dark-text-secondary mb-2">
                         Select a month to view:
                     </label>
                     <div className="relative">
@@ -47,33 +48,33 @@ const AgendaHistoryModal: React.FC<{ isOpen: boolean; onClose: () => void }> = (
                             id="month-select"
                             value={selectedMonth}
                             onChange={(e) => setSelectedMonth(e.target.value)}
-                            className="bg-background border border-border-color text-text-secondary text-sm rounded-lg focus:ring-2 focus:ring-primary focus:border-primary focus:outline-none block w-full pl-3 pr-10 py-2.5 appearance-none transition-all"
+                            className="bg-background dark:bg-dark-background border border-border-color dark:border-dark-border-color text-text-secondary dark:text-dark-text-secondary text-sm rounded-lg focus:ring-2 focus:ring-primary focus:border-primary focus:outline-none block w-full pl-3 pr-10 py-2.5 appearance-none transition-all"
                         >
                             {monthOptions.map(opt => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
                             ))}
                         </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-secondary">
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-secondary dark:text-dark-secondary">
                            <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
                         </div>
                     </div>
                 </div>
 
-                <div className="border-t border-border-color pt-4">
-                    <h4 className="font-semibold text-text-primary mb-3">Events for {selectedMonthLabel}</h4>
+                <div className="border-t border-border-color dark:border-dark-border-color pt-4">
+                    <h4 className="font-semibold text-text-primary dark:text-dark-text-primary mb-3">Events for {selectedMonthLabel}</h4>
                     <div className="space-y-3 text-sm max-h-80 overflow-y-auto">
                         {filteredEvents.length > 0 ? (
                             filteredEvents.map(event => (
-                                <div key={event.id} className="flex items-start p-2 bg-background rounded-md">
-                                    <div className="font-semibold text-primary w-20 shrink-0">{event.time}</div>
-                                    <div className="text-text-secondary flex-grow">
-                                        <p className="font-medium text-text-primary">{event.title}</p>
+                                <div key={event.id} className="flex items-start p-2 bg-background dark:bg-dark-background rounded-md">
+                                    <div className="font-semibold text-primary dark:text-dark-primary w-20 shrink-0">{event.time}</div>
+                                    <div className="text-text-secondary dark:text-dark-text-secondary flex-grow">
+                                        <p className="font-medium text-text-primary dark:text-dark-text-primary">{event.title}</p>
                                         {event.attendees && <p className="text-xs">With: {event.attendees.join(', ')}</p>}
                                     </div>
                                 </div>
                             ))
                         ) : (
-                            <div className="text-secondary text-center py-8">
+                            <div className="text-secondary dark:text-dark-secondary text-center py-8">
                                 No agenda items found for this day in {selectedMonthLabel}.
                             </div>
                         )}

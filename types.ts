@@ -9,6 +9,7 @@ export enum Language {
 }
 
 export type Persona = 'Formal' | 'Neutral' | 'Casual';
+export type Theme = 'light' | 'dark' | 'system';
 
 export interface GoogleUser {
     name: string;
@@ -18,6 +19,7 @@ export interface GoogleUser {
 
 export interface UserPreferences {
     persona: Persona;
+    theme: Theme;
 }
 
 export interface Reminder {

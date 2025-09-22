@@ -11,37 +11,45 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
+        darkMode: 'class', // Enable class-based dark mode
         theme: {
           extend: {
             fontFamily: {
               sans: ['Inter', 'sans-serif'],
             },
             colors: {
-              'background': '#F8F9FA', // Soft gray background
-              'surface': '#FFFFFF', // White for cards, modals
-              'primary': '#14B8A6', // Teal
+              // Light Theme Colors
+              'background': '#F8F9FA',
+              'surface': '#FFFFFF',
+              'primary': '#14B8A6',
               'primary-hover': '#0D9488',
-              'secondary': '#64748B', // Muted gray for secondary text/icons
+              'secondary': '#64748B',
               'text-primary': '#1E293B',
               'text-secondary': '#475569',
               'border-color': '#E2E8F0',
+              // Dark Theme Colors
+              'dark-background': '#0F172A', // slate-900
+              'dark-surface': '#1E293B',    // slate-800
+              'dark-primary': '#2DD4BF',      // A slightly brighter teal for dark mode
+              'dark-primary-hover': '#5EEAD4',
+              'dark-secondary': '#94A3B8',   // slate-400
+              'dark-text-primary': '#F1F5F9', // slate-100
+              'dark-text-secondary': '#CBD5E1', // slate-300
+              'dark-border-color': '#334155', // slate-700
             },
             boxShadow: {
               'card': '0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07)',
               'card-hover': '0 10px 15px -3px rgb(0 0 0 / 0.07), 0 4px 6px -4px rgb(0 0 0 / 0.07)',
+              'dark-card': '0 4px 6px -1px rgb(0 0 0 / 0.2), 0 2px 4px -2px rgb(0 0 0 / 0.2)',
+              'dark-card-hover': '0 10px 15px -3px rgb(0 0 0 / 0.2), 0 4px 6px -4px rgb(0 0 0 / 0.2)',
             },
             keyframes: {
-              'waveform': {
-                '0%, 40%, 100%': { transform: 'scaleY(0.4)' },
-                '20%': { transform: 'scaleY(1.0)' },
-              },
               'fadeIn': {
                 '0%': { opacity: 0, transform: 'translateY(10px)' },
                 '100%': { opacity: 1, transform: 'translateY(0)' },
               }
             },
             animation: {
-              'waveform': 'waveform 1.2s infinite ease-in-out',
               'fadeIn': 'fadeIn 0.5s ease-out forwards',
             }
           },
@@ -61,7 +69,7 @@
 }
 </script>
 </head>
-  <body class="bg-background text-text-primary font-sans">
+  <body class="bg-background text-text-primary dark:bg-dark-background dark:text-dark-text-primary font-sans">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
