@@ -10,19 +10,19 @@ import ChatMessage from './ChatMessage';
 import SuggestionChip from './common/SuggestionChip';
 
 const translations = {
-    [Language.ENGLISH]: { placeholder: "Research anything or ask Lisa a question..." },
-    [Language.TAMIL]: { placeholder: "எதையும் ஆராயுங்கள் அல்லது லிசாவிடம் ஒரு கேள்வியைக் கேளுங்கள்..." },
-    [Language.HINDI]: { placeholder: "कुछ भी शोध करें या लिसा से कोई प्रश्न पूछें..." },
-    [Language.SPANISH]: { placeholder: "Investiga cualquier cosa o hazle una pregunta a Lisa..." },
-    [Language.FRENCH]: { placeholder: "Recherchez n'importe quoi ou posez une question à Lisa..." },
-    [Language.GERMAN]: { placeholder: "Recherchieren Sie alles oder stellen Sie Lisa eine Frage..." },
-    [Language.JAPANESE]: { placeholder: "何かを調べるか、リサに質問してください..." },
+    [Language.ENGLISH]: { placeholder: "Ask Lisa anything or drop a file...", googleSearch: "Google Search" },
+    [Language.TAMIL]: { placeholder: "லிசாவிடம் எதையும் கேளுங்கள் அல்லது ஒரு கோப்பை விடுங்கள்...", googleSearch: "கூகிள் தேடல்" },
+    [Language.HINDI]: { placeholder: "लिसा से कुछ भी पूछें या कोई फ़ाइल छोड़ें...", googleSearch: "गूगल खोज" },
+    [Language.SPANISH]: { placeholder: "Pregúntale a Lisa cualquier cosa o suelta un archivo...", googleSearch: "Búsqueda de Google" },
+    [Language.FRENCH]: { placeholder: "Demandez n'importe quoi à Lisa ou déposez un fichier...", googleSearch: "Recherche Google" },
+    [Language.GERMAN]: { placeholder: "Fragen Sie Lisa alles oder legen Sie eine Datei ab...", googleSearch: "Google Suche" },
+    [Language.JAPANESE]: { placeholder: "リサに何でも質問するか、ファイルをドロップしてください...", googleSearch: "Google検索" },
 };
 
 const ChatAssistant: React.FC = () => {
   const { 
     language, user, activeSession, sendMessage, isSendingMessage,
-    isVoiceOutputEnabled, toggleVoiceOutput,
+    isVoiceOutputEnabled, toggleVoiceOutput, chatInput, setChatInput,
   } = useAppContext();
   
   const t = translations[language];
@@ -32,11 +32,18 @@ const ChatAssistant: React.FC = () => {
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [attachmentPreview, setAttachmentPreview] = useState<{ name: string; type: string; } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [activeMode, setActiveMode] = useState('search');
+  const [useGoogleSearch, setUseGoogleSearch] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  useEffect(() => {
+    if (chatInput) {
+      setInput(chatInput);
+      setChatInput(''); 
+    }
+  }, [chatInput, setChatInput]);
+
   const messages = activeSession?.messages ?? [];
   const isGreetingLoading = !activeSession && !isSendingMessage;
   const showSuggestions = messages.length <= 1 && !isSendingMessage;
@@ -45,8 +52,9 @@ const ChatAssistant: React.FC = () => {
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isSendingMessage]);
 
   const processFile = (file: File) => {
-    if (file.type === 'image/avif') {
-      alert("AVIF image format is not supported. Please use PNG, JPG, or WEBP.");
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/heic', 'image/heif', 'text/plain', 'text/markdown', 'text/html', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      alert(`File type ${file.type} is not supported. Please use one of: ${allowedTypes.join(', ')}`);
       return;
     }
     setAttachedFile(file);
@@ -83,7 +91,7 @@ const ChatAssistant: React.FC = () => {
 
     setInput('');
     clearAttachment();
-    await sendMessage(currentInput, attachedFile ?? undefined);
+    await sendMessage(currentInput, attachedFile ?? undefined, useGoogleSearch);
   };
   
   const suggestions = [
@@ -147,9 +155,9 @@ const ChatAssistant: React.FC = () => {
             )}
             <div className="flex items-center justify-between pl-2">
                 <div className="flex items-center gap-1 bg-background dark:bg-dark-background rounded-lg p-1">
-                    <button onClick={() => setActiveMode('search')} className={`p-1.5 rounded-md transition-colors ${activeMode === 'search' ? 'bg-primary text-white' : 'text-secondary dark:text-dark-secondary hover:bg-gray-200 dark:hover:bg-slate-700'}`} title="Search Mode">{ICONS.searchMode}</button>
-                    <button onClick={() => setActiveMode('copilot')} className={`p-1.5 rounded-md transition-colors ${activeMode === 'copilot' ? 'bg-primary text-white' : 'text-secondary dark:text-dark-secondary hover:bg-gray-200 dark:hover:bg-slate-700'}`} title="Copilot Mode">{ICONS.copilotMode}</button>
-                    <button onClick={() => setActiveMode('focus')} className={`p-1.5 rounded-md transition-colors ${activeMode === 'focus' ? 'bg-primary text-white' : 'text-secondary dark:text-dark-secondary hover:bg-gray-200 dark:hover:bg-slate-700'}`} title="Focus Mode">{ICONS.focusMode}</button>
+                    <button onClick={() => setUseGoogleSearch(prev => !prev)} className={`p-1.5 rounded-md transition-colors text-sm flex items-center gap-1.5 ${useGoogleSearch ? 'bg-primary text-white' : 'text-secondary dark:text-dark-text-secondary hover:bg-gray-200 dark:hover:bg-slate-700'}`} title={t.googleSearch}>
+                      {ICONS.google} {t.googleSearch}
+                    </button>
                 </div>
                 <div className="flex items-center gap-2 text-secondary dark:text-dark-secondary">
                     <input ref={fileInputRef} type="file" onChange={handleFileChange} className="hidden"/>

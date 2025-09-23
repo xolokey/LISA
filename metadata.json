@@ -2,6 +2,7 @@
   "name": "Lisa - Advanced AI Personal Assistant",
   "description": "An advanced AI personal assistant named Lisa, integrating data entry, customer support, development assistance, and more. It features multilingual voice and text capabilities, DevOps automation, and a robust, user-friendly interface.",
   "requestFramePermissions": [
-    "microphone"
+    "microphone",
+    "camera"
   ]
 }

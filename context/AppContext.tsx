@@ -2,7 +2,7 @@
 
 import React, { createContext, useState, useContext, ReactNode, useCallback, useEffect } from 'react';
 import { Language, UserPreferences, Persona, Reminder, TodoItem, CalendarEvent, GoogleUser, ChatSession, ChatMessage, Theme } from '../types';
-import { generateChatResponse, getGreeting, analyzeSentiment, generateChatTitle } from '../services/geminiService';
+import { generateChatResponse, analyzeSentiment, generateChatTitle } from '../services/geminiService';
 
 interface AppContextType {
   language: Language;
@@ -25,15 +25,18 @@ interface AppContextType {
   user: GoogleUser | null;
   signIn: () => void;
   signOut: () => void;
-  // New Session Management
   sessions: ChatSession[];
   activeSessionId: string | null;
   activeSession: ChatSession | null;
   createNewChat: () => void;
   setActiveSession: (sessionId: string) => void;
   deleteSession: (sessionId: string) => void;
-  sendMessage: (prompt: string, file?: File) => Promise<void>;
+  sendMessage: (prompt: string, file?: File, useGoogleSearch?: boolean) => Promise<void>;
   isSendingMessage: boolean;
+  isSidebarCollapsed: boolean;
+  toggleSidebar: () => void;
+  setChatInput: (prompt: string) => void;
+  chatInput: string;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -98,6 +101,16 @@ const errorTranslations = {
     },
 };
 
+const staticGreetings = {
+    [Language.ENGLISH]: "Hello! I'm Lisa. How can I help you today?",
+    [Language.TAMIL]: "வணக்கம்! நான் லிசா. நான் உங்களுக்கு எப்படி உதவ முடியும்?",
+    [Language.HINDI]: "नमस्ते! मैं लिसा हूँ। मैं आपकी कैसे मदद कर सकती हूँ?",
+    [Language.SPANISH]: "¡Hola! Soy Lisa. ¿Cómo puedo ayudarte hoy?",
+    [Language.FRENCH]: "Bonjour ! Je suis Lisa. Comment puis-je vous aider aujourd'hui ?",
+    [Language.GERMAN]: "Hallo! Ich bin Lisa. Wie kann ich Ihnen heute helfen?",
+    [Language.JAPANESE]: "こんにちは！リサです。今日はどのようにお手伝いできますか？"
+};
+
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>(Language.ENGLISH);
   const [isVoiceOutputEnabled, setIsVoiceOutputEnabled] = useState(false);
@@ -113,6 +126,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+
   const voiceEnabledRef = React.useRef(isVoiceOutputEnabled);
   useEffect(() => { voiceEnabledRef.current = isVoiceOutputEnabled; }, [isVoiceOutputEnabled]);
   
@@ -167,30 +183,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setCorePreferences(prev => ({ ...prev, ...newPrefs }));
   };
 
-  const createNewChat = useCallback(async () => {
-    setIsSendingMessage(true);
-    try {
-        const greetingText = await getGreeting(language, preferences.persona);
-        if (voiceEnabledRef.current) {
-          speechSynthesis.cancel();
-          const utterance = new SpeechSynthesisUtterance(greetingText);
-          utterance.lang = language;
-          speechSynthesis.speak(utterance);
-        }
-        const newSession: ChatSession = {
-            id: new Date().toISOString(),
-            title: "New Chat",
-            messages: [{ role: 'model', content: greetingText }],
-            createdAt: Date.now(),
-        };
-        setSessions(prev => [newSession, ...prev]);
-        setActiveSessionId(newSession.id);
-    } catch (error) {
-        console.error("Failed to create new chat:", error);
-    } finally {
-        setIsSendingMessage(false);
+  const createNewChat = useCallback(() => {
+    const greetingText = staticGreetings[language] || staticGreetings[Language.ENGLISH];
+    if (voiceEnabledRef.current) {
+      speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(greetingText);
+      utterance.lang = language;
+      speechSynthesis.speak(utterance);
     }
-  }, [language, preferences.persona]);
+    const newSession: ChatSession = {
+        id: new Date().toISOString(),
+        title: "New Chat",
+        messages: [{ role: 'model', content: greetingText }],
+        createdAt: Date.now(),
+    };
+    setSessions(prev => [newSession, ...prev]);
+    setActiveSessionId(newSession.id);
+  }, [language]);
   
   useEffect(() => {
       const storedSessions = localStorage.getItem('chatSessions');
@@ -218,7 +227,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
   }, [activeSessionId, createNewChat]);
 
-  const sendMessage = useCallback(async (prompt: string, file?: File) => {
+  const sendMessage = useCallback(async (prompt: string, file?: File, useGoogleSearch?: boolean) => {
     if (!activeSessionId) return;
 
     setIsSendingMessage(true);
@@ -244,7 +253,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const currentSession = sessions.find(s => s.id === activeSessionId);
       const history = currentSession?.messages.filter(m => typeof m.content === 'string').map(m => ({ role: m.role, parts: [{ text: m.content }] })) ?? [];
 
-      const response = await generateChatResponse(history, prompt, language, preferences.persona, !!user, file);
+      const response = await generateChatResponse(history, prompt, language, preferences.persona, !!user, file, useGoogleSearch);
 
       // Handle tool-call side effects
       if (response.reminder) addReminder(response.reminder);
@@ -310,6 +319,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return !prev;
     });
   };
+
+  const toggleSidebar = () => setIsSidebarCollapsed(prev => !prev);
   
   const addReminder = useCallback((reminder: Omit<Reminder, 'id'>) => {
     setReminders(prev => [...prev, { ...reminder, id: new Date().toISOString() }]);
@@ -352,6 +363,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         sessions, activeSessionId, activeSession,
         createNewChat, setActiveSession, deleteSession,
         sendMessage, isSendingMessage,
+        isSidebarCollapsed, toggleSidebar,
+        chatInput, setChatInput,
     }}>
       {children}
     </AppContext.Provider>

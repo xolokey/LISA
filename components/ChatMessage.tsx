@@ -28,7 +28,8 @@ const translations = {
         mindfulnessBreak: 'Mindfulness Break',
         breakDescription: 'Take a moment to relax and refocus. Close your eyes and breathe deeply.',
         stop: 'Stop',
-        eventScheduled: 'Event Scheduled'
+        eventScheduled: 'Event Scheduled',
+        sources: 'Sources'
     },
     // ... other languages would go here for full localization
 };
@@ -268,10 +269,11 @@ const getSentimentIcon = (sentiment?: Sentiment) => {
 const ChatMessage: React.FC<{ message: ChatMessageType, onSendMessage: (prompt: string) => void; user: GoogleUser | null; }> = ({ message, onSendMessage, user }) => {
   const isUser = message.role === 'user';
   const [copied, setCopied] = useState(false);
+  const { language } = useAppContext();
+  const t = translations[language] || translations[Language.ENGLISH];
 
   const handleShare = () => {
       let contentToCopy = message.content;
-      // You can add more logic here to format different types of content for sharing
       navigator.clipboard.writeText(contentToCopy);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -283,9 +285,11 @@ const ChatMessage: React.FC<{ message: ChatMessageType, onSendMessage: (prompt: 
   
   return (
     <div className={`group flex items-end gap-2 animate-fadeIn ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isUser ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-slate-600 text-text-primary dark:text-dark-text-primary'}`}>
-          {isUser ? user ? user.name.charAt(0).toUpperCase() : 'U' : 'L'}
-      </div>
+      {!isUser && (
+        <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-gray-200 dark:bg-slate-600 text-text-primary dark:text-dark-text-primary">
+            L
+        </div>
+      )}
       <div className={`max-w-2xl rounded-xl p-1 ${bubbleClasses}`}>
         <div className="px-3 py-1 space-y-2">
             {message.fileInfo && (
@@ -306,6 +310,21 @@ const ChatMessage: React.FC<{ message: ChatMessageType, onSendMessage: (prompt: 
             {message.reminderRemoved && <ReminderRemovedCard data={message.reminderRemoved} user={user} />}
             {message.breakTimer && <BreakTimerCard duration={message.breakTimer.durationSeconds} />}
             {message.interactiveChoice && <InteractiveChoiceCard data={message.interactiveChoice} onSendMessage={onSendMessage} />}
+            
+            {message.groundingChunks && message.groundingChunks.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-white/20 dark:border-slate-600">
+                <h5 className="text-xs font-semibold mb-1 text-white/80 dark:text-slate-400">{t.sources}</h5>
+                <div className="flex flex-wrap gap-2">
+                  {message.groundingChunks.map((chunk, index) => chunk.web && (
+                    <a href={chunk.web.uri} target="_blank" rel="noopener noreferrer" key={index} title={chunk.web.title}
+                      className="flex items-center gap-1.5 bg-white/10 dark:bg-slate-700/50 hover:bg-white/20 dark:hover:bg-slate-600/50 text-xs text-white/90 dark:text-slate-300 px-2 py-0.5 rounded-full transition-colors">
+                      {ICONS.web}
+                      <span className="truncate max-w-48">{chunk.web.title || new URL(chunk.web.uri).hostname}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
         </div>
       </div>
       <div className="self-center flex flex-col gap-2 mb-1">
@@ -314,6 +333,12 @@ const ChatMessage: React.FC<{ message: ChatMessageType, onSendMessage: (prompt: 
             {copied ? ICONS.check : ICONS.share}
         </button>
       </div>
+       {isUser && user && (
+        <img src={user.picture} alt={user.name} className="w-8 h-8 rounded-full shrink-0"/>
+      )}
+       {isUser && !user && (
+        <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-primary text-white">U</div>
+      )}
     </div>
   );
 };

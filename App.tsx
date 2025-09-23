@@ -7,7 +7,8 @@ import ChatAssistant from './components/ChatAssistant';
 import CodeGenerator from './components/CodeGenerator';
 import InvoiceParser from './components/InvoiceParser';
 import PipelineGenerator from './components/PipelineGenerator';
-import Settings from './components/Settings'; // Import the new Settings component
+import Settings from './components/Settings';
+import ImageStudio from './components/ImageStudio'; // Import the new Image Studio component
 import { AppProvider } from './context/AppContext';
 
 const App: React.FC = () => {
@@ -20,7 +21,8 @@ const App: React.FC = () => {
           <Route path="/code-generator" element={<CodeGenerator />} />
           <Route path="/invoice-parser" element={<InvoiceParser />} />
           <Route path="/pipeline-generator" element={<PipelineGenerator />} />
-          <Route path="/settings" element={<Settings />} /> {/* Add the new route */}
+          <Route path="/image-studio" element={<ImageStudio />} /> {/* Add the new route */}
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </Layout>
     </AppProvider>

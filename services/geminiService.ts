@@ -1,6 +1,9 @@
 
-import { GoogleGenAI, Type } from '@google/genai';
-import { InvoiceData, Language, Persona, Sentiment, FileSearchResult, ChatMessage, Reminder, TodoItem, DraftEmail, CalendarEvent } from '../types';
+
+
+
+import { GoogleGenAI, Type, Modality } from '@google/genai';
+import { InvoiceData, Language, Persona, Sentiment, FileSearchResult, ChatMessage, Reminder, TodoItem, DraftEmail, CalendarEvent, ProjectFiles } from '../types';
 
 const API_KEY = process.env.API_KEY;
 
@@ -80,24 +83,10 @@ const getSystemInstruction = (language: Language, persona: Persona, isSignedIn: 
 Your current user's language is ${languageName}. Respond in this language unless specified otherwise.
 ${personaInstruction}
 ${authContext}
-Your capabilities include conversation, sentiment analysis, code generation, document parsing, task management (reminders, to-dos), calendar coordination, email drafting, and file searching via tools. Be helpful, proactive, and concise.`;
+Your capabilities include conversation, sentiment analysis, code generation, document parsing, task management (reminders, to-dos), calendar coordination, email drafting, file searching via tools, and accessing up-to-date information with Google Search. Be helpful, proactive, and concise.`;
 };
 
-export const getGreeting = async (language: Language, persona: Persona): Promise<string> => {
-    const languageName = getLanguageName(language);
-    const prompt = `You are Lisa, an advanced AI assistant. Generate a short, friendly, welcoming greeting. The user's language is ${languageName} and their preferred tone is ${persona}. The response MUST be in ${languageName} and match the tone.
-    Example in English (Neutral): "Hello! I'm Lisa. How can I help you today?"
-    Your response should be only the greeting text.`;
-    
-    const result = await model.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: { temperature: 0.7 }
-    });
-    return result.text;
-};
-
-const tools = [{
+const functionCallingTools = [{
     functionDeclarations: [
         {
             name: 'searchFiles',
@@ -182,13 +171,21 @@ export const generateChatResponse = async (
   language: Language,
   persona: Persona,
   isSignedIn: boolean,
-  file?: File
+  file?: File,
+  useGoogleSearch?: boolean,
 ): Promise<Partial<ChatMessage>> => {
+
+  const config: any = { systemInstruction: getSystemInstruction(language, persona, isSignedIn) };
+  if (useGoogleSearch) {
+    config.tools = [{ googleSearch: {} }];
+  } else {
+    config.tools = functionCallingTools;
+  }
 
   const chat = ai.chats.create({
     model: 'gemini-2.5-flash',
     history: history,
-    config: { systemInstruction: getSystemInstruction(language, persona, isSignedIn), tools }
+    config: config,
   });
 
   const messageParts: any[] = [{ text: newMessage }];
@@ -197,6 +194,8 @@ export const generateChatResponse = async (
   }
   
   let result = await chat.sendMessage({ message: messageParts });
+  
+  const groundingChunks = result.candidates?.[0]?.groundingMetadata?.groundingChunks;
 
   let functionCalls = result.candidates?.[0]?.content?.parts
     .filter(part => !!part.functionCall)
@@ -242,7 +241,6 @@ export const generateChatResponse = async (
           toolExecutionResult = { status: 'success', event };
           toolResponsePayload = { calendarEvent: event };
       } else if (call.name === 'presentChoices') {
-          // This tool doesn't need a response back to the model, it's a UI instruction.
           return {
               interactiveChoice: {
                   prompt: call.args.prompt as string,
@@ -256,10 +254,10 @@ export const generateChatResponse = async (
           message: [{ functionResponse: { name: call.name, response: toolExecutionResult } }]
       });
       
-      return { content: toolResponse.text, ...toolResponsePayload };
+      return { content: toolResponse.text, groundingChunks, ...toolResponsePayload };
   }
 
-  return { content: result.text };
+  return { content: result.text, groundingChunks };
 };
 
 export const analyzeSentiment = async (text: string): Promise<Sentiment> => {
@@ -283,35 +281,113 @@ export const analyzeSentiment = async (text: string): Promise<Sentiment> => {
   return parsed.sentiment as Sentiment;
 };
 
-export const generateCode = async (prompt: string, language: Language, files: File[]): Promise<string> => {
-    const languageName = getLanguageName(language);
-    const languageInstruction = language === Language.ENGLISH
-        ? 'Comments should be in English.'
-        : `Important: All comments and explanations within the code must be in ${languageName}.`;
-    
-    const promptParts: any[] = [
-        `You are an expert code generation assistant.`,
-        `Generate a complete, production-ready code snippet based on the following request.`,
-        `If files are provided, use them as context for the code generation.`,
-        languageInstruction,
-        `Provide only the code, wrapped in a single markdown block (e.g., \`\`\`language ... \`\`\`).`,
-        `Do not add any explanation or introductory text outside the code block.`,
-        `\nRequest: "${prompt}"`,
-    ];
+// --- START: New Code Generation Service ---
 
-    for (const file of files) {
-        promptParts.push(await fileToGenerativePart(file));
+const codeGenerationSystemInstruction = `You are a collective of world-class software engineers operating as a single entity, an AI code generation expert named Lisa. Your expertise spans the entire software development lifecycle and a multitude of roles, including:
+- **Software Developer/Engineer**: You write clean, efficient, scalable, and maintainable code in any language. You are a master of algorithms, data structures, and software architecture.
+- **AI/ML Engineers**: You understand and can implement complex AI and machine learning models, data pipelines, and infrastructure.
+- **DevOps, Site Reliability (SREs), and Platform Engineers**: You are an expert in CI/CD, infrastructure as code (Terraform, Pulumi), containerization (Docker, Kubernetes), monitoring, and ensuring high availability and reliability.
+- **Data and Analytics**: You can design data models, write complex SQL queries, and build data-intensive applications.
+- **Cybersecurity Specialists**: You write secure code by default, understand threat modeling, and can implement security best practices.
+- **Infrastructure and Cloud Roles**: You are proficient in AWS, Google Cloud, and Azure, and can design and manage cloud infrastructure.
+- **Quality Assurance and Testing**: You generate code with testing in mind, including unit tests, integration tests, and end-to-end tests.
+- **Design and User Experience**: You can generate front-end code (HTML, CSS, JavaScript, React, etc.) that is not only functional but also aesthetically pleasing, accessible (ARIA), and user-friendly.
+- **Product and Strategy Roles**: You understand the business context and can make intelligent decisions about features and implementation details.
+- **Leadership and Architecture**: You can design entire systems, considering trade-offs and future scalability. You create logical and well-organized file structures.
+- **Blockchain Developers/Architects**: You are capable of creating smart contracts and decentralized applications.
+- **Technical Writers**: You produce excellent documentation, including README files and code comments, in the requested language.
+
+Your primary goal is to assist the user in building and modifying software projects directly within this web-based IDE. You will be given requests to generate entire projects, or to modify specific files within an existing project structure. Adhere strictly to the output format requested in the prompt.`;
+
+export const generateProjectFromPrompt = async (prompt: string, language: Language): Promise<ProjectFiles> => {
+    const languageName = getLanguageName(language);
+    const result = await model.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: `Based on the following request, generate a complete file structure and the content for each file. The user's preferred language for comments and documentation is ${languageName}.
+        
+Request: "${prompt}"
+
+Your output MUST be a single, valid JSON array of objects, where each object has a "filePath" (e.g., 'src/App.js') and a "content" key.
+For web projects, ensure the 'index.html' is self-contained or uses relative paths correctly for the live preview to work. For complex apps, include a 'README.md' with setup instructions.
+Example format:
+[
+  { "filePath": "index.html", "content": "<!DOCTYPE html>..." },
+  { "filePath": "css/style.css", "content": "body { ... }" },
+  { "filePath": "js/main.js", "content": "console.log('Hello');" }
+]`,
+        config: {
+            systemInstruction: codeGenerationSystemInstruction,
+            responseMimeType: "application/json",
+            temperature: 0.1,
+            responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        filePath: { type: Type.STRING },
+                        content: { type: Type.STRING }
+                    },
+                    required: ['filePath', 'content']
+                }
+            }
+        }
+    });
+    try {
+        const jsonText = result.text.trim();
+        const fileArray: { filePath: string; content: string }[] = JSON.parse(jsonText);
+        const projectFiles: ProjectFiles = fileArray.reduce((acc, file) => {
+            acc[file.filePath] = file.content;
+            return acc;
+        }, {} as ProjectFiles);
+        return projectFiles;
+    } catch (e) {
+        console.error("Failed to parse JSON response from AI:", result.text);
+        throw new Error("AI returned invalid project structure. Please try again.");
     }
+}
+
+export const editFileContent = async (
+    userEditRequest: string,
+    projectFiles: ProjectFiles,
+    activeFilePath: string,
+    language: Language
+): Promise<string> => {
+    const languageName = getLanguageName(language);
+    const currentContent = projectFiles[activeFilePath];
 
     const result = await model.generateContent({
         model: 'gemini-2.5-flash',
-        contents: { parts: promptParts },
+        contents: `You are editing a file within a larger project. Your generated comments and documentation should be in ${languageName}.
+        
+PROJECT CONTEXT (Full file structure):
+\`\`\`
+${Object.keys(projectFiles).join('\n')}
+\`\`\`
+
+CURRENT FILE PATH:
+\`${activeFilePath}\`
+
+CURRENT FILE CONTENT:
+\`\`\`
+${currentContent}
+\`\`\`
+
+USER'S EDIT REQUEST:
+"${userEditRequest}"
+
+Based on the request, provide the new, complete content for the file at \`${activeFilePath}\`. Your response should ONLY be the raw code for the new file content. Do not wrap it in markdown backticks or add any explanations.
+`,
         config: {
-          temperature: 0.2
+            systemInstruction: codeGenerationSystemInstruction,
+            temperature: 0.0,
         }
     });
-    return result.text;
+
+    return result.text.trim();
 };
+
+
+// --- END: New Code Generation Service ---
 
 
 export const parseInvoice = async (imageFile: File): Promise<InvoiceData> => {
@@ -423,4 +499,48 @@ export const generateChatTitle = async (firstMessage: string): Promise<string> =
         config: { temperature: 0.3 }
     });
     return result.text.replace(/"/g, '').trim();
+};
+
+
+export const generateImage = async (prompt: string, aspectRatio: string): Promise<string> => {
+    const response = await ai.models.generateImages({
+        model: 'imagen-4.0-generate-001',
+        prompt: prompt,
+        config: {
+          numberOfImages: 1,
+          outputMimeType: 'image/jpeg',
+          aspectRatio: aspectRatio as any,
+        },
+    });
+    const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
+    return `data:image/jpeg;base64,${base64ImageBytes}`;
+};
+
+export const editImage = async (prompt: string, imageFile: File): Promise<{text?: string; imageUrl?: string}> => {
+    const imagePart = await fileToGenerativePart(imageFile);
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image-preview',
+        contents: {
+            parts: [
+                imagePart,
+                { text: prompt },
+            ],
+        },
+        config: {
+            responseModalities: [Modality.IMAGE, Modality.TEXT],
+        },
+    });
+
+    let textResult: string | undefined;
+    let imageUrlResult: string | undefined;
+
+    for (const part of response.candidates[0].content.parts) {
+        if (part.text) {
+            textResult = part.text;
+        } else if (part.inlineData) {
+            const base64ImageBytes: string = part.inlineData.data;
+            imageUrlResult = `data:image/png;base64,${base64ImageBytes}`;
+        }
+    }
+    return { text: textResult, imageUrl: imageUrlResult };
 };

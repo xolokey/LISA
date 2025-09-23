@@ -1,6 +1,7 @@
 
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ChatAssistant from './ChatAssistant'; 
 import { useAppContext } from '../context/AppContext';
 import Card from './common/Card';
@@ -19,6 +20,43 @@ const generateTimeSlots = () => {
     return slots;
 };
 const timeSlots = generateTimeSlots();
+
+const QuickActionsWidget: React.FC = () => {
+    const { setChatInput } = useAppContext();
+    const navigate = useNavigate();
+
+    const handleAction = (prompt: string) => {
+        setChatInput(prompt);
+        if (window.location.hash !== '#/') {
+            navigate('/');
+        }
+    };
+    
+    const actions = [
+        { label: 'Draft an email...', prompt: 'Draft an email to ' },
+        { label: 'Summarize text...', prompt: 'Summarize the following text: ' },
+        { label: 'Translate to French...', prompt: 'Translate this to French: ' },
+        { label: 'Create a new to-do', prompt: 'Add a new to-do item: ' },
+    ];
+
+    return (
+        <Card>
+            <h3 className="font-semibold text-text-primary dark:text-dark-text-primary mb-3">Quick Actions</h3>
+            <div className="grid grid-cols-2 gap-2">
+                {actions.map(action => (
+                    <button 
+                        key={action.label}
+                        onClick={() => handleAction(action.prompt)}
+                        className="text-left text-sm p-2 bg-background dark:bg-dark-background hover:bg-gray-100 dark:hover:bg-slate-700/60 rounded-lg transition-colors border border-border-color dark:border-dark-border-color text-text-secondary dark:text-dark-text-secondary"
+                    >
+                        {action.label}
+                    </button>
+                ))}
+            </div>
+        </Card>
+    );
+};
+
 
 const AgendaWidget: React.FC = () => {
     const { user, calendarEvents, addCalendarEvent, removeCalendarEvent } = useAppContext();
@@ -193,6 +231,7 @@ const Dashboard: React.FC = () => {
           <ChatAssistant />
       </div>
       <aside className="w-full lg:w-80 lg:h-full flex-shrink-0 flex flex-col gap-6 animate-fadeIn">
+          <QuickActionsWidget />
           <AgendaWidget />
           <TodoWidget />
           <RemindersWidget />

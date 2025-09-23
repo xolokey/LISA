@@ -74,6 +74,13 @@ export interface FileSearchResult {
     }[];
 }
 
+export interface GroundingChunk {
+  web?: {
+    uri: string;
+    title: string;
+  };
+}
+
 export interface ChatMessage {
   role: 'user' | 'model';
   content: string; 
@@ -97,12 +104,15 @@ export interface ChatMessage {
   // Interactive components
   interactiveChoice?: { prompt: string; options: { title: string; payload: string }[] };
   breakTimer?: { durationSeconds: number };
+  // Grounding
+  groundingChunks?: GroundingChunk[];
 }
 
 export interface ChatSession {
   id: string;
   title: string;
-  // Fix: Corrected typo from ChatMessageType to ChatMessage.
   messages: ChatMessage[];
   createdAt: number;
 }
+
+export type ProjectFiles = { [filePath: string]: string };
