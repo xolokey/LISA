@@ -2,6 +2,7 @@
 
 
 
+
 import { GoogleGenAI, Type, Modality } from '@google/genai';
 import { InvoiceData, Language, Persona, Sentiment, FileSearchResult, ChatMessage, Reminder, TodoItem, DraftEmail, CalendarEvent, ProjectFiles } from '../types';
 
@@ -299,6 +300,32 @@ const codeGenerationSystemInstruction = `You are a collective of world-class sof
 
 Your primary goal is to assist the user in building and modifying software projects directly within this web-based IDE. You will be given requests to generate entire projects, or to modify specific files within an existing project structure. Adhere strictly to the output format requested in the prompt.`;
 
+const processJsonResponse = (jsonText: string): ProjectFiles => {
+    try {
+        const fileArray: { filePath: string; content: string }[] = JSON.parse(jsonText.trim());
+        const projectFiles: ProjectFiles = fileArray.reduce((acc, file) => {
+            acc[file.filePath] = file.content;
+            return acc;
+        }, {} as ProjectFiles);
+        return projectFiles;
+    } catch (e) {
+        console.error("Failed to parse JSON response from AI:", jsonText);
+        throw new Error("AI returned invalid project structure. Please try again.");
+    }
+};
+
+const fileListSchema = {
+    type: Type.ARRAY,
+    items: {
+        type: Type.OBJECT,
+        properties: {
+            filePath: { type: Type.STRING },
+            content: { type: Type.STRING }
+        },
+        required: ['filePath', 'content']
+    }
+};
+
 export const generateProjectFromPrompt = async (prompt: string, language: Language): Promise<ProjectFiles> => {
     const languageName = getLanguageName(language);
     const result = await model.generateContent({
@@ -308,43 +335,37 @@ export const generateProjectFromPrompt = async (prompt: string, language: Langua
 Request: "${prompt}"
 
 Your output MUST be a single, valid JSON array of objects, where each object has a "filePath" (e.g., 'src/App.js') and a "content" key.
-For web projects, ensure the 'index.html' is self-contained or uses relative paths correctly for the live preview to work. For complex apps, include a 'README.md' with setup instructions.
-Example format:
-[
-  { "filePath": "index.html", "content": "<!DOCTYPE html>..." },
-  { "filePath": "css/style.css", "content": "body { ... }" },
-  { "filePath": "js/main.js", "content": "console.log('Hello');" }
-]`,
+For web projects, ensure the 'index.html' is self-contained or uses relative paths correctly for the live preview to work. For complex apps, include a 'README.md' with setup instructions.`,
         config: {
             systemInstruction: codeGenerationSystemInstruction,
             responseMimeType: "application/json",
             temperature: 0.1,
-            responseSchema: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                        filePath: { type: Type.STRING },
-                        content: { type: Type.STRING }
-                    },
-                    required: ['filePath', 'content']
-                }
-            }
+            responseSchema: fileListSchema
         }
     });
-    try {
-        const jsonText = result.text.trim();
-        const fileArray: { filePath: string; content: string }[] = JSON.parse(jsonText);
-        const projectFiles: ProjectFiles = fileArray.reduce((acc, file) => {
-            acc[file.filePath] = file.content;
-            return acc;
-        }, {} as ProjectFiles);
-        return projectFiles;
-    } catch (e) {
-        console.error("Failed to parse JSON response from AI:", result.text);
-        throw new Error("AI returned invalid project structure. Please try again.");
-    }
+    return processJsonResponse(result.text);
 }
+
+export const generateProjectFromRepoUrl = async (repoUrl: string, language: Language): Promise<ProjectFiles> => {
+    const languageName = getLanguageName(language);
+    const result = await model.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: `I will provide a public GitHub repository URL. Your task is to act as a web scraper and code analyzer. "Scrape" the repository, understand its structure and the content of each file, and then generate a complete file structure and content for the entire project. The user's preferred language for any generated comments or documentation is ${languageName}.
+        
+GitHub URL: "${repoUrl}"
+
+Your output MUST be a single, valid JSON array of objects, where each object has a "filePath" and a "content" key.
+For web projects, ensure the 'index.html' is self-contained or uses relative paths correctly for the live preview to work.`,
+        config: {
+            systemInstruction: codeGenerationSystemInstruction,
+            responseMimeType: "application/json",
+            temperature: 0.1,
+            responseSchema: fileListSchema
+        }
+    });
+    return processJsonResponse(result.text);
+};
+
 
 export const editFileContent = async (
     userEditRequest: string,
