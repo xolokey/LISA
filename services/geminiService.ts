@@ -3,6 +3,7 @@
 
 
 
+
 import { GoogleGenAI, Type, Modality } from '@google/genai';
 import { InvoiceData, Language, Persona, Sentiment, FileSearchResult, ChatMessage, Reminder, TodoItem, DraftEmail, CalendarEvent, ProjectFiles } from '../types';
 
@@ -366,45 +367,61 @@ For web projects, ensure the 'index.html' is self-contained or uses relative pat
     return processJsonResponse(result.text);
 };
 
+interface ProjectEditResult {
+    summary: string;
+    fileChanges: { filePath: string; content: string }[];
+}
 
-export const editFileContent = async (
-    userEditRequest: string,
+export const performProjectEdit = async (
+    chatHistory: { role: 'user' | 'model'; content: string }[],
+    userPrompt: string,
     projectFiles: ProjectFiles,
-    activeFilePath: string,
     language: Language
-): Promise<string> => {
+): Promise<ProjectEditResult> => {
     const languageName = getLanguageName(language);
-    const currentContent = projectFiles[activeFilePath];
+    const serializedProject = JSON.stringify(projectFiles, null, 2);
+    // Use only the last 6 turns of conversation to keep the prompt size manageable
+    const serializedHistory = chatHistory.slice(-6).map(turn => `${turn.role}: ${turn.content}`).join('\n');
+
+    const prompt = `You are performing edits on a software project. Your generated comments and documentation should be in ${languageName}.
+        
+PROJECT CONTEXT (Full file structure and content):
+\`\`\`json
+${serializedProject}
+\`\`\`
+        
+RECENT CHAT HISTORY:
+${serializedHistory}
+
+USER'S LATEST REQUEST:
+"${userPrompt}"
+
+Based on the user's request, the chat history, and the full project context, determine the necessary file modifications. This can include editing existing files, creating new files, or deleting files (by returning an empty 'content' string for that file path).
+Your output MUST be a single, valid JSON object with two keys:
+1. "summary": A brief, friendly, natural-language summary (in ${languageName}) of the changes you made for the chat interface. Describe what you did.
+2. "fileChanges": An array of objects, where each object has a "filePath" and the new complete "content" for that file.`;
+
+    const responseSchema = {
+        type: Type.OBJECT,
+        properties: {
+            summary: { type: Type.STRING },
+            fileChanges: fileListSchema
+        },
+        required: ['summary', 'fileChanges']
+    };
 
     const result = await model.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `You are editing a file within a larger project. Your generated comments and documentation should be in ${languageName}.
-        
-PROJECT CONTEXT (Full file structure):
-\`\`\`
-${Object.keys(projectFiles).join('\n')}
-\`\`\`
-
-CURRENT FILE PATH:
-\`${activeFilePath}\`
-
-CURRENT FILE CONTENT:
-\`\`\`
-${currentContent}
-\`\`\`
-
-USER'S EDIT REQUEST:
-"${userEditRequest}"
-
-Based on the request, provide the new, complete content for the file at \`${activeFilePath}\`. Your response should ONLY be the raw code for the new file content. Do not wrap it in markdown backticks or add any explanations.
-`,
+        contents: prompt,
         config: {
             systemInstruction: codeGenerationSystemInstruction,
+            responseMimeType: "application/json",
             temperature: 0.0,
+            responseSchema: responseSchema
         }
     });
 
-    return result.text.trim();
+    return JSON.parse(result.text.trim()) as ProjectEditResult;
 };
 
 
