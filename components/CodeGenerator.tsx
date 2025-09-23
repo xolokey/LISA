@@ -26,9 +26,12 @@ interface FileSystemWritableFileStream extends WritableStream {
     close: () => Promise<void>;
 }
 
-// FIX: Initialize useRef with the callback to ensure it's never undefined inside the interval.
-// This resolves a potential race condition and a confusing "Expected 1 arguments, but got 0" error
-// that can occur with some TypeScript configurations when useRef is not initialized.
+// Type definitions for editor history
+interface HistoryState {
+  stack: string[];
+  pointer: number;
+}
+
 const useInterval = (callback: () => void, delay: number | null) => {
   const savedCallback = useRef(callback);
   useEffect(() => {
@@ -51,7 +54,7 @@ const getFileExtension = (filename: string) => {
 };
 
 // Utility to build a tree structure from file paths
-const buildFileTree = (files: ProjectFiles) => {
+const buildFileTree = (files: ProjectFiles | null) => {
     const tree = {};
     if (!files) return tree;
     Object.keys(files).forEach(path => {
@@ -106,12 +109,12 @@ const FileTree: React.FC<{
                     return (
                         <li key={currentPath}>
                             <button onClick={() => onToggleFolder(currentPath)} className="w-full text-left flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700/50">
-                                <span className="transition-transform duration-200">{isOpen ? '▼' : '►'}</span>
+                                <span className={`transition-transform duration-200 text-xs ${isOpen ? 'rotate-90' : ''}`}>►</span>
                                 <span className="text-yellow-500">{isOpen ? ICONS.folderOpen : ICONS.folderClosed}</span>
                                 <span>{name}</span>
                             </button>
                             {isOpen && (
-                                <div style={{ paddingLeft: `${(level + 1) * 12}px` }}>
+                                <div className="pl-4">
                                     <FileTree tree={tree[name].children} onSelect={onSelect} activeFile={activeFile} expandedFolders={expandedFolders} onToggleFolder={onToggleFolder} path={currentPath} level={level + 1} />
                                 </div>
                             )}
@@ -120,7 +123,7 @@ const FileTree: React.FC<{
                 } else {
                     return (
                         <li key={currentPath}>
-                            <button onClick={() => onSelect(currentPath)} className={`w-full text-left flex items-center gap-2 py-1.5 px-2 rounded-md transition-colors ${activeFile === currentPath ? 'bg-primary/10 text-primary' : 'hover:bg-gray-100 dark:hover:bg-slate-700/50'}`}>
+                            <button onClick={() => onSelect(currentPath)} className={`w-full text-left flex items-center gap-2 py-1.5 pl-6 pr-2 rounded-md transition-colors ${activeFile === currentPath ? 'bg-primary/10 text-primary' : 'hover:bg-gray-100 dark:hover:bg-slate-700/50'}`}>
                                 <FileIcon filename={name} />
                                 <span className="truncate">{name}</span>
                             </button>
@@ -164,14 +167,16 @@ const CodeGenerator: React.FC = () => {
     const [previewError, setPreviewError] = useState<string | null>(null);
     const blobUrlsRef = useRef<string[]>([]);
     
+    // State for undo/redo
+    const [history, setHistory] = useState<{ [filePath: string]: HistoryState }>({});
+    const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     // Environment check for File System Access API restrictions
     useEffect(() => {
         let restricted = false;
         try {
-            // If window.top is not accessible or not equal to window.self, we are in a cross-origin iframe.
             restricted = window.top !== window.self;
         } catch (e) {
-            // Accessing window.top can throw an error in a sandboxed iframe.
             restricted = true;
         }
         if (restricted) {
@@ -185,7 +190,7 @@ const CodeGenerator: React.FC = () => {
         try {
             const savedProject = localStorage.getItem('codeGenProject');
             if (savedProject) {
-                setProjectFiles(JSON.parse(savedProject));
+                handleProjectLoad(JSON.parse(savedProject));
             }
         } catch (e) {
             console.error("Failed to load project from local storage", e);
@@ -193,10 +198,10 @@ const CodeGenerator: React.FC = () => {
     }, []);
 
     useInterval(() => {
-        if (projectFiles && !directoryHandle) { // Only auto-save for non-local projects
+        if (projectFiles && !directoryHandle) {
             localStorage.setItem('codeGenProject', JSON.stringify(projectFiles));
         }
-    }, 30000); // Auto-save every 30 seconds
+    }, 30000); 
 
 
     const fileTree = useMemo(() => buildFileTree(projectFiles), [projectFiles]);
@@ -204,18 +209,19 @@ const CodeGenerator: React.FC = () => {
     useEffect(() => {
         if (activeFile && projectFiles) {
             setEditorContent(projectFiles[activeFile]);
-            
-            // Auto-expand folders
+            // Auto-expand parent folders of the active file
             const parts = activeFile.split('/');
-            let currentPath = '';
-            const newExpandedFolders = { ...expandedFolders };
-            parts.slice(0, -1).forEach(part => {
-                currentPath = currentPath ? `${currentPath}/${part}` : part;
-                newExpandedFolders[currentPath] = true;
-            });
-            setExpandedFolders(newExpandedFolders);
+            if (parts.length > 1) {
+                const newExpanded: { [key: string]: boolean } = {};
+                let currentPath = '';
+                parts.slice(0, -1).forEach(part => {
+                    currentPath = currentPath ? `${currentPath}/${part}` : part;
+                    newExpanded[currentPath] = true;
+                });
+                setExpandedFolders(prev => ({ ...prev, ...newExpanded }));
+            }
         }
-    }, [activeFile]); // only run when activeFile changes
+    }, [activeFile, projectFiles]);
 
     // Cleanup blobs on unmount
     useEffect(() => {
@@ -294,12 +300,21 @@ const CodeGenerator: React.FC = () => {
         setError('');
         setInitialPrompt('');
         setRepoUrl('');
+        setHistory({});
         localStorage.removeItem('codeGenProject');
+        setExpandedFolders({});
     };
 
     const handleProjectLoad = (files: ProjectFiles) => {
         setProjectFiles(files);
         const firstFile = Object.keys(files).find(f => f.toLowerCase().includes('index.html')) || Object.keys(files)[0];
+        
+        const initialHistory = Object.keys(files).reduce((acc, path) => {
+            acc[path] = { stack: [files[path]], pointer: 0 };
+            return acc;
+        }, {} as { [filePath: string]: HistoryState });
+        setHistory(initialHistory);
+        
         setActiveFile(firstFile);
     };
 
@@ -391,6 +406,24 @@ const CodeGenerator: React.FC = () => {
             setSaveStatus('idle');
         }
     };
+    
+    const pushToHistory = useCallback((filePath: string, content: string) => {
+        setHistory(prev => {
+            const fileHistory = prev[filePath] || { stack: [], pointer: -1 };
+            if (fileHistory.stack[fileHistory.pointer] === content) {
+                return prev; // No change, don't add to history
+            }
+            const newStack = fileHistory.stack.slice(0, fileHistory.pointer + 1);
+            newStack.push(content);
+            return {
+                ...prev,
+                [filePath]: {
+                    stack: newStack,
+                    pointer: newStack.length - 1
+                }
+            };
+        });
+    }, []);
 
     const handleAiEdit = async () => {
         if (!aiPrompt.trim() || !activeFile || !projectFiles) return;
@@ -400,20 +433,79 @@ const CodeGenerator: React.FC = () => {
             const newContent = await editFileContent(aiPrompt, projectFiles, activeFile, language);
             setEditorContent(newContent);
             setProjectFiles(prev => prev ? { ...prev, [activeFile]: newContent } : null);
+            pushToHistory(activeFile, newContent);
             setAiPrompt('');
         } catch (err) { setError(err instanceof Error ? err.message : 'Failed to apply changes.'); } finally { setIsLoading(false); }
     };
     
     const handleEditorChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setEditorContent(e.target.value);
-        if (activeFile && projectFiles) {
-            setProjectFiles(prev => ({ ...prev!, [activeFile]: e.target.value }));
+        const newContent = e.target.value;
+        setEditorContent(newContent);
+        if (activeFile) {
+            setProjectFiles(prev => ({ ...prev!, [activeFile]: newContent }));
+            if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
+            debounceTimeoutRef.current = setTimeout(() => {
+                pushToHistory(activeFile, newContent);
+            }, 750);
         }
     };
+    
+    const handleUndo = useCallback(() => {
+        if (!activeFile) return;
+        setHistory(prev => {
+            const fileHistory = prev[activeFile];
+            if (fileHistory && fileHistory.pointer > 0) {
+                const newPointer = fileHistory.pointer - 1;
+                const newContent = fileHistory.stack[newPointer];
+                setEditorContent(newContent);
+                setProjectFiles(p => ({ ...p!, [activeFile]: newContent }));
+                return { ...prev, [activeFile]: { ...fileHistory, pointer: newPointer } };
+            }
+            return prev;
+        });
+    }, [activeFile]);
+    
+    const handleRedo = useCallback(() => {
+        if (!activeFile) return;
+        setHistory(prev => {
+            const fileHistory = prev[activeFile];
+            if (fileHistory && fileHistory.pointer < fileHistory.stack.length - 1) {
+                const newPointer = fileHistory.pointer + 1;
+                const newContent = fileHistory.stack[newPointer];
+                setEditorContent(newContent);
+                setProjectFiles(p => ({ ...p!, [activeFile]: newContent }));
+                return { ...prev, [activeFile]: { ...fileHistory, pointer: newPointer } };
+            }
+            return prev;
+        });
+    }, [activeFile]);
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.ctrlKey || event.metaKey) {
+                if (event.key === 'z') {
+                    event.preventDefault();
+                    if (event.shiftKey) {
+                        handleRedo();
+                    } else {
+                        handleUndo();
+                    }
+                } else if (event.key === 'y') {
+                    event.preventDefault();
+                    handleRedo();
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [handleUndo, handleRedo]);
 
     const toggleFolder = (folderPath: string) => {
         setExpandedFolders(prev => ({ ...prev, [folderPath]: !prev[folderPath] }));
     };
+    
+    const canUndo = activeFile && history[activeFile] && history[activeFile].pointer > 0;
+    const canRedo = activeFile && history[activeFile] && history[activeFile].pointer < history[activeFile].stack.length - 1;
 
     if (!projectFiles && !isLoading) {
         return (
@@ -491,7 +583,12 @@ const CodeGenerator: React.FC = () => {
             {/* Middle Panel: Editor */}
             <main className="flex-1 flex flex-col">
                 <div className="flex items-center justify-between p-2 border-b border-border-color dark:border-dark-border-color bg-surface dark:bg-dark-surface text-sm text-text-primary dark:text-dark-text-primary">
-                    <span>{activeFile || 'Select a file to edit'}</span>
+                    <div className="flex items-center gap-2">
+                        <button onClick={handleUndo} disabled={!canUndo} title="Undo (Ctrl+Z)" className="p-1 rounded-md text-secondary disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-slate-700">{ICONS.undo}</button>
+                        <button onClick={handleRedo} disabled={!canRedo} title="Redo (Ctrl+Y)" className="p-1 rounded-md text-secondary disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-slate-700">{ICONS.redo}</button>
+                        <span className="border-l border-border-color dark:border-dark-border-color h-5 mx-1"></span>
+                        <span>{activeFile || 'Select a file to edit'}</span>
+                    </div>
                     <span className={`text-xs transition-opacity duration-500 ${saveStatus !== 'idle' ? 'opacity-100' : 'opacity-0'}`}>
                         {saveStatus === 'saving' && 'Saving...'}
                         {saveStatus === 'saved' && 'Saved.'}
