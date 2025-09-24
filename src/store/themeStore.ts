@@ -408,6 +408,9 @@ export const useThemeStore = create<ThemeState>()(
           
           return () => mediaQuery.removeEventListener('change', handleChange);
         }
+        
+        // Return a no-op cleanup function when media queries are not supported
+        return () => {};
       },
     }),
     {
