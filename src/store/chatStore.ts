@@ -1,66 +1,133 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ChatSession, ChatMessage } from '../types';
+import type { ChatSession, ChatMessage, ChatState } from '../../types';
 
-interface ChatState {
-  sessions: ChatSession[];
-  activeSessionId: string | null;
-  isLoading: boolean;
-  error: string | null;
+// Enhanced chat store interface
+interface ChatStore extends ChatState {
+  // Session management
+  readonly setSessions: (sessions: ChatSession[]) => void;
+  readonly addSession: (session: ChatSession) => void;
+  readonly updateSession: (sessionId: string, updates: Partial<ChatSession>) => void;
+  readonly deleteSession: (sessionId: string) => void;
+  readonly setCurrentSession: (sessionId: string | null) => void;
   
-  // Actions
-  setSessions: (sessions: ChatSession[]) => void;
-  addSession: (session: ChatSession) => void;
-  updateSession: (sessionId: string, updates: Partial<ChatSession>) => void;
-  deleteSession: (sessionId: string) => void;
-  setActiveSession: (sessionId: string | null) => void;
-  addMessage: (sessionId: string, message: ChatMessage) => void;
-  setLoading: (loading: boolean) => void;
-  setError: (error: string | null) => void;
+  // Message management
+  readonly addMessage: (sessionId: string, message: ChatMessage) => void;
+  readonly updateMessage: (sessionId: string, messageId: string, updates: Partial<ChatMessage>) => void;
+  readonly deleteMessage: (sessionId: string, messageId: string) => void;
   
-  // Computed
-  activeSession: () => ChatSession | null;
+  // UI state
+  readonly setLoading: (loading: boolean) => void;
+  readonly setError: (error: string | null) => void;
+  readonly clearError: () => void;
+  
+  // Computed properties
+  readonly getCurrentSession: () => ChatSession | null;
+  readonly getMessageCount: (sessionId?: string) => number;
+  readonly getSessionById: (sessionId: string) => ChatSession | undefined;
 }
 
-export const useChatStore = create<ChatState>()(
+const API_BASE_URL = process.env['NODE_ENV'] === 'production' 
+  ? 'https://your-api-domain.com/api' 
+  : 'http://localhost:5000/api';
+
+// Enhanced API client for chat operations
+class ChatApiClient {
+  private static getAuthHeaders(): Record<string, string> {
+    const token = JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  private static async makeRequest<T>(
+    endpoint: string, 
+    options: RequestInit = {}
+  ): Promise<T> {
+    const url = `${API_BASE_URL}${endpoint}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...this.getAuthHeaders(),
+        ...options.headers,
+      },
+      ...options,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return data;
+  }
+
+  static async getSessions(limit = 50, offset = 0): Promise<ChatSession[]> {
+    return this.makeRequest<ChatSession[]>(
+      `/chat/sessions?limit=${limit}&offset=${offset}`
+    );
+  }
+
+  static async createSession(session: Partial<ChatSession>): Promise<ChatSession> {
+    return this.makeRequest<ChatSession>('/chat/sessions', {
+      method: 'POST',
+      body: JSON.stringify(session),
+    });
+  }
+
+  static async updateSession(sessionId: string, updates: Partial<ChatSession>): Promise<void> {
+    return this.makeRequest<void>(`/chat/sessions/${sessionId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  static async deleteSession(sessionId: string): Promise<void> {
+    return this.makeRequest<void>(`/chat/sessions/${sessionId}`, {
+      method: 'DELETE',
+    });
+  }
+}
+
+export const useChatStore = create<ChatStore>()(  
   persist(
     (set, get) => ({
       sessions: [],
-      activeSessionId: null,
+      currentSessionId: null,
       isLoading: false,
       error: null,
 
-      setSessions: (sessions) => set({ sessions }),
+      setSessions: (sessions: ChatSession[]) => set({ sessions }),
       
-      addSession: (session) => 
+      addSession: (session: ChatSession) => 
         set((state) => ({ 
           sessions: [session, ...state.sessions],
-          activeSessionId: session.id 
+          currentSessionId: session.id 
         })),
       
-      updateSession: (sessionId, updates) =>
+      updateSession: (sessionId: string, updates: Partial<ChatSession>) =>
         set((state) => ({
           sessions: state.sessions.map((session) =>
             session.id === sessionId ? { ...session, ...updates } : session
           ),
         })),
       
-      deleteSession: (sessionId) =>
+      deleteSession: (sessionId: string) =>
         set((state) => {
           const newSessions = state.sessions.filter((s) => s.id !== sessionId);
-          const newActiveId = state.activeSessionId === sessionId 
+          const newCurrentId = state.currentSessionId === sessionId 
             ? (newSessions[0]?.id || null) 
-            : state.activeSessionId;
+            : state.currentSessionId;
           
           return {
             sessions: newSessions,
-            activeSessionId: newActiveId,
+            currentSessionId: newCurrentId,
           };
         }),
       
-      setActiveSession: (sessionId) => set({ activeSessionId: sessionId }),
+      setCurrentSession: (sessionId: string | null) => set({ currentSessionId: sessionId }),
       
-      addMessage: (sessionId, message) =>
+      addMessage: (sessionId: string, message: ChatMessage) =>
         set((state) => ({
           sessions: state.sessions.map((session) =>
             session.id === sessionId
@@ -68,20 +135,61 @@ export const useChatStore = create<ChatState>()(
               : session
           ),
         })),
+
+      updateMessage: (sessionId: string, messageId: string, updates: Partial<ChatMessage>) =>
+        set((state) => ({
+          sessions: state.sessions.map((session) =>
+            session.id === sessionId
+              ? {
+                  ...session,
+                  messages: session.messages.map((msg) =>
+                    msg.id === messageId ? { ...msg, ...updates } : msg
+                  ),
+                }
+              : session
+          ),
+        })),
+
+      deleteMessage: (sessionId: string, messageId: string) =>
+        set((state) => ({
+          sessions: state.sessions.map((session) =>
+            session.id === sessionId
+              ? {
+                  ...session,
+                  messages: session.messages.filter((msg) => msg.id !== messageId),
+                }
+              : session
+          ),
+        })),
       
-      setLoading: (loading) => set({ isLoading: loading }),
-      setError: (error) => set({ error }),
+      setLoading: (loading: boolean) => set({ isLoading: loading }),
+      setError: (error: string | null) => set({ error }),
+      clearError: () => set({ error: null }),
       
-      activeSession: () => {
+      getCurrentSession: () => {
         const state = get();
-        return state.sessions.find((s) => s.id === state.activeSessionId) || null;
+        return state.sessions.find((s) => s.id === state.currentSessionId) || null;
+      },
+
+      getMessageCount: (sessionId?: string) => {
+        const state = get();
+        if (sessionId) {
+          const session = state.sessions.find((s) => s.id === sessionId);
+          return session?.messages.length || 0;
+        }
+        return state.sessions.reduce((total, session) => total + session.messages.length, 0);
+      },
+
+      getSessionById: (sessionId: string) => {
+        const state = get();
+        return state.sessions.find((s) => s.id === sessionId);
       },
     }),
     {
       name: 'chat-storage',
-      partialize: (state) => ({
+      partialize: (state: ChatStore) => ({
         sessions: state.sessions,
-        activeSessionId: state.activeSessionId,
+        currentSessionId: state.currentSessionId,
       }),
     }
   )

@@ -1,136 +1,209 @@
-type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-
-interface LogEntry {
-  level: LogLevel;
-  message: string;
-  timestamp: string;
-  data?: any;
-  stack?: string;
+// Enhanced client-side logging system
+export enum LogLevel {
+  DEBUG = 0,
+  INFO = 1,
+  WARN = 2,
+  ERROR = 3,
 }
 
-class Logger {
-  private isDevelopment = process.env.NODE_ENV === 'development';
-  private logs: LogEntry[] = [];
-  private maxLogs = 1000;
+export interface LogEntry {
+  readonly timestamp: number;
+  readonly level: LogLevel;
+  readonly message: string;
+  readonly context?: Record<string, unknown>;
+  readonly source?: string | undefined;
+  readonly userId?: string | undefined;
+  readonly sessionId?: string | undefined;
+}
 
-  private createLogEntry(level: LogLevel, message: string, data?: any): LogEntry {
+// Main logger class
+export class Logger {
+  private static instance: Logger;
+  private minLevel: LogLevel = LogLevel.INFO;
+  private context: Record<string, unknown> = {};
+  private userId?: string;
+  private sessionId: string;
+
+  constructor() {
+    this.sessionId = this.generateSessionId();
+  }
+
+  static getInstance(): Logger {
+    if (!Logger.instance) {
+      Logger.instance = new Logger();
+    }
+    return Logger.instance;
+  }
+
+  setMinLevel(level: LogLevel): void {
+    this.minLevel = level;
+  }
+
+  setUserId(userId: string): void {
+    this.userId = userId;
+  }
+
+  setContext(context: Record<string, unknown>): void {
+    this.context = { ...this.context, ...context };
+  }
+
+  clearContext(): void {
+    this.context = {};
+  }
+
+  private generateSessionId(): string {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  }
+
+  private log(
+    level: LogLevel,
+    message: string,
+    context?: Record<string, unknown>,
+    source?: string
+  ): void {
+    if (level < this.minLevel) return;
+
     const entry: LogEntry = {
+      timestamp: Date.now(),
       level,
       message,
-      timestamp: new Date().toISOString(),
-      data,
+      context: { ...this.context, ...context },
+      source,
+      userId: this.userId,
+      sessionId: this.sessionId,
     };
 
-    if (level === 'error' && data instanceof Error) {
-      entry.stack = data.stack;
-    }
-
-    return entry;
-  }
-
-  private addLog(entry: LogEntry) {
-    this.logs.push(entry);
+    // Console output with colors
+    const levelName = LogLevel[level];
+    const timestamp = new Date(entry.timestamp).toISOString();
+    const colors = {
+      [LogLevel.DEBUG]: '#888',
+      [LogLevel.INFO]: '#007acc',
+      [LogLevel.WARN]: '#ff8c00',
+      [LogLevel.ERROR]: '#ff0000',
+    };
     
-    // Keep only the most recent logs
-    if (this.logs.length > this.maxLogs) {
-      this.logs = this.logs.slice(-this.maxLogs);
-    }
+    const color = colors[level];
+    console.log(
+      `%c[${timestamp}] ${levelName}: ${message}`,
+      `color: ${color}; font-weight: bold`,
+      context ? '\nContext:' : '',
+      context || ''
+    );
 
-    // In production, send to external logging service
-    if (!this.isDevelopment && entry.level === 'error') {
-      this.sendToExternalService(entry);
-    }
+    // Store in localStorage for persistence
+    this.persistLog(entry);
   }
 
-  private sendToExternalService(entry: LogEntry) {
-    // Example: Send to external logging service
-    // fetch('/api/logs', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify(entry)
-    // }).catch(() => {
-    //   // Silently fail to avoid infinite loops
-    // });
-  }
-
-  debug(message: string, data?: any) {
-    const entry = this.createLogEntry('debug', message, data);
-    this.addLog(entry);
-    
-    if (this.isDevelopment) {
-      console.debug(`[DEBUG] ${message}`, data || '');
+  private persistLog(entry: LogEntry): void {
+    try {
+      const logs = this.getLogs();
+      logs.push(entry);
+      
+      // Keep only the latest 1000 entries
+      if (logs.length > 1000) {
+        logs.splice(0, logs.length - 1000);
+      }
+      
+      localStorage.setItem('app_logs', JSON.stringify(logs));
+    } catch (error) {
+      console.warn('Failed to persist log:', error);
     }
   }
 
-  info(message: string, data?: any) {
-    const entry = this.createLogEntry('info', message, data);
-    this.addLog(entry);
-    
-    if (this.isDevelopment) {
-      console.info(`[INFO] ${message}`, data || '');
+  getLogs(): LogEntry[] {
+    try {
+      const stored = localStorage.getItem('app_logs');
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.warn('Failed to read logs:', error);
+      return [];
     }
   }
 
-  warn(message: string, data?: any) {
-    const entry = this.createLogEntry('warn', message, data);
-    this.addLog(entry);
-    
-    console.warn(`[WARN] ${message}`, data || '');
+  clearLogs(): void {
+    localStorage.removeItem('app_logs');
   }
 
-  error(message: string, error?: any) {
-    const entry = this.createLogEntry('error', message, error);
-    this.addLog(entry);
-    
-    console.error(`[ERROR] ${message}`, error || '');
+  debug(message: string, context?: Record<string, unknown>, source?: string): void {
+    this.log(LogLevel.DEBUG, message, context, source);
   }
 
-  getLogs(level?: LogLevel): LogEntry[] {
-    if (level) {
-      return this.logs.filter(log => log.level === level);
-    }
-    return [...this.logs];
+  info(message: string, context?: Record<string, unknown>, source?: string): void {
+    this.log(LogLevel.INFO, message, context, source);
   }
 
-  clearLogs() {
-    this.logs = [];
+  warn(message: string, context?: Record<string, unknown>, source?: string): void {
+    this.log(LogLevel.WARN, message, context, source);
   }
 
-  // Performance monitoring
-  time(label: string) {
-    if (this.isDevelopment) {
-      console.time(label);
-    }
+  error(message: string, context?: Record<string, unknown>, source?: string): void {
+    this.log(LogLevel.ERROR, message, context, source);
   }
 
-  timeEnd(label: string) {
-    if (this.isDevelopment) {
-      console.timeEnd(label);
-    }
+  // Helper methods for common patterns
+  logUserAction(action: string, details?: Record<string, unknown>): void {
+    this.info(`User action: ${action}`, details, 'user_action');
+  }
+
+  logApiCall(method: string, url: string, duration?: number, status?: number): void {
+    this.info(`API call: ${method} ${url}`, {
+      method,
+      url,
+      duration,
+      status,
+    }, 'api_call');
+  }
+
+  logError(error: Error, context?: Record<string, unknown>): void {
+    this.error(error.message, {
+      name: error.name,
+      stack: error.stack,
+      ...context,
+    }, 'error');
+  }
+
+  logPerformance(metric: string, value: number, unit: string = 'ms'): void {
+    this.info(`Performance: ${metric}`, {
+      metric,
+      value,
+      unit,
+    }, 'performance');
   }
 }
 
-// Global logger instance
-export const logger = new Logger();
+// Export singleton instance
+export const logger = Logger.getInstance();
 
-// Error tracking for unhandled errors
-if (typeof window !== 'undefined') {
-  window.addEventListener('error', (event) => {
-    logger.error('Unhandled error', {
-      message: event.message,
-      filename: event.filename,
-      lineno: event.lineno,
-      colno: event.colno,
-      error: event.error
-    });
-  });
+// Convenience functions
+export const logInfo = (message: string, context?: Record<string, unknown>) => 
+  logger.info(message, context);
 
-  window.addEventListener('unhandledrejection', (event) => {
-    logger.error('Unhandled promise rejection', {
-      reason: event.reason,
-      promise: event.promise
-    });
-  });
-}
+export const logError = (message: string, context?: Record<string, unknown>) => 
+  logger.error(message, context);
 
-export default logger;
+export const logWarn = (message: string, context?: Record<string, unknown>) => 
+  logger.warn(message, context);
+
+export const logDebug = (message: string, context?: Record<string, unknown>) => 
+  logger.debug(message, context);
+
+// Performance monitoring helper
+export const measurePerformance = <T>(name: string, fn: () => T): T => {
+  const start = performance.now();
+  const result = fn();
+  const duration = performance.now() - start;
+  logger.logPerformance(name, duration);
+  return result;
+};
+
+export const measureAsyncPerformance = async <T>(
+  name: string, 
+  fn: () => Promise<T>
+): Promise<T> => {
+  const start = performance.now();
+  const result = await fn();
+  const duration = performance.now() - start;
+  logger.logPerformance(name, duration);
+  return result;
+};

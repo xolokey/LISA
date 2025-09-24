@@ -1,0 +1,154 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  name            String
+  password        String?
+  avatar          String?
+  emailVerified   Boolean  @default(false)
+  role            String   @default("user") // "user" | "admin"
+  
+  // Social Authentication
+  providerId      String?  // Firebase UID for social auth
+  provider        String?  // "google" | "github" | "microsoft" | "email"
+  lastSignInAt    DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  chatSessions ChatSession[]
+  preferences  UserPreferences?
+  usageStats   UsageStats[]
+  socialAccounts SocialAccount[]
+
+  @@map("users")
+}
+
+model ChatSession {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  messages  Json     // Store messages as JSON array
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("chat_sessions")
+}
+
+model UserPreferences {
+  id               String  @id @default(cuid())
+  userId           String  @unique
+  theme            String  @default("system") // "light" | "dark" | "system"
+  language         String  @default("en")
+  voiceEnabled     Boolean @default(false)
+  notificationsEnabled Boolean @default(true)
+  customSettings   Json?   // Store additional custom preferences as JSON
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model UsageStats {
+  id              String   @id @default(cuid())
+  userId          String
+  date            DateTime @default(now())
+  feature         String   // "chat", "code-generator", "invoice-parser", etc.
+  tokensUsed      Int      @default(0)
+  requestsCount   Int      @default(1)
+  sessionDuration Int?     // Duration in seconds
+  metadata        Json?    // Additional metadata
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("usage_stats")
+  @@index([userId, date])
+  @@index([feature])
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  contentType String   // "pdf", "text", "markdown", etc.
+  fileSize    Int?
+  filePath    String?  // Path to stored file
+  tags        String?  // Comma-separated tags for categorization
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("documents")
+  @@index([contentType])
+  @@index([isPublic])
+}
+
+model ApiKey {
+  id          String   @id @default(cuid())
+  name        String
+  keyHash     String   @unique // Hashed API key
+  permissions Json     // Permissions as JSON object
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@map("api_keys")
+  @@index([keyHash])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String   // "login", "logout", "create_session", etc.
+  resource  String   // Resource being accessed
+  metadata  Json?    // Additional context
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model SocialAccount {
+  id              String   @id @default(cuid())
+  userId          String
+  provider        String   // "google" | "github" | "microsoft"
+  providerId      String   // Provider's user ID
+  providerEmail   String?
+  accessToken     String?  // Encrypted access token
+  refreshToken    String?  // Encrypted refresh token
+  tokenExpiresAt  DateTime?
+  scope           String?  // Granted permissions/scopes
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@unique([userId, provider])
+  @@map("social_accounts")
+}

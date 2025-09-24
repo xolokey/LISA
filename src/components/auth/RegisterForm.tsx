@@ -1,8 +1,21 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '../../store/authStore';
-import Card from '../common/Card';
-import Spinner from '../common/Spinner';
+import { useSocialAuth } from '../../hooks/useSocialAuth';
+import { SocialAuthButtons } from './SocialAuthButtons';
+import { SocialAuthError } from '../../services/socialAuthService';
+
+// Simple Card component
+const Card: React.FC<{children: React.ReactNode, className?: string}> = ({ children, className = '' }) => (
+  <div className={`bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm p-6 ${className}`}>
+    {children}
+  </div>
+);
+
+// Simple Spinner component
+const Spinner: React.FC<{className?: string}> = ({ className = '' }) => (
+  <div className={`h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin ${className}`} />
+);
 
 interface RegisterFormProps {
   onToggleMode: () => void;
@@ -17,8 +30,10 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleMode }) => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
+  const [socialError, setSocialError] = useState<string | null>(null);
   
   const { register, isLoading, error, clearError } = useAuthStore();
+  const { signInWithProvider } = useSocialAuth();
 
   const calculatePasswordStrength = (password: string) => {
     let strength = 0;
@@ -42,16 +57,30 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleMode }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
+    setSocialError(null);
     
     if (formData.password !== formData.confirmPassword) {
       return; // Error will be shown in validation
     }
     
     try {
-      await register(formData.email, formData.password, formData.name);
+      await register({
+        email: formData.email,
+        password: formData.password,
+        name: formData.name
+      });
     } catch (error) {
       // Error is handled by the store
     }
+  };
+
+  const handleSocialAuthSuccess = (result: any) => {
+    // Social auth success is handled by the useSocialAuth hook
+    console.log('Social auth success:', result);
+  };
+
+  const handleSocialAuthError = (error: SocialAuthError) => {
+    setSocialError(error.message);
   };
 
   const getPasswordStrengthColor = () => {
@@ -218,6 +247,40 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onToggleMode }) => {
             )}
           </button>
         </form>
+
+        {/* Social Authentication */}
+        <div className="mt-6">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300 dark:border-gray-600" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white dark:bg-slate-800 text-gray-500 dark:text-gray-400">
+                Or continue with
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <SocialAuthButtons
+              onSuccess={handleSocialAuthSuccess}
+              onError={handleSocialAuthError}
+              disabled={isLoading}
+              size="medium"
+              showText={true}
+            />
+          </div>
+
+          {socialError && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg"
+            >
+              <p className="text-red-600 dark:text-red-400 text-sm">{socialError}</p>
+            </motion.div>
+          )}
+        </div>
 
         <div className="mt-6 text-center">
           <p className="text-text-secondary dark:text-dark-text-secondary">
